@@ -1,0 +1,5 @@
+.DS_Store
+*.zip
+sharecycle-pwa/node_modules
+sharecycle-pwa/dist
+sharecycle-pwa/*.local
