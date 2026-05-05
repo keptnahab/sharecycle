@@ -7,12 +7,12 @@ import React,{useState,useEffect,useMemo}from"react";
 const DK={bg:"#1A111A",card:"#2A1E2A",card2:"#362836",card3:"#483848",
   ink:"#F6EDF2",ink2:"#C8A8BE",muted:"#8A6880",
   line:"rgba(246,237,242,0.08)",line2:"rgba(246,237,242,0.18)",
-  coral:"#FF8A6A",mauve:"#6D4C6D",gold:"#F4C46B",
+  coral:"#FF8A6A",mauve:"#C46A85",gold:"#F4C46B",
   follicular:"#7ABFAA",luteal:"#9B8FD4"};
 const LK={bg:"#F6EDF2",card:"#FFFFFF",card2:"#F0E4EC",card3:"#E4D4DE",
   ink:"#1A111A",ink2:"#6D4C6D",muted:"#A0809A",
   line:"rgba(109,76,109,0.1)",line2:"rgba(109,76,109,0.2)",
-  coral:"#FF8A6A",mauve:"#6D4C6D",gold:"#E0A830",
+  coral:"#FF8A6A",mauve:"#B05070",gold:"#E0A830",
   follicular:"#4A9880",luteal:"#7060B0"};
 
 const MO=["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
