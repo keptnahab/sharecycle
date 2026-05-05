@@ -27,13 +27,14 @@ const iso=d=>{const x=toD(d);const y=x.getFullYear(),m=String(x.getMonth()+1).pa
 const parse=s=>{const[y,m,d]=s.split("-").map(Number);return toD(new Date(y,m-1,d));};
 const niceFmt=s=>s?parse(s).toLocaleDateString("de-DE",{day:"2-digit",month:"long",year:"numeric"}):"";
 
-const phOf=(date,start,cl,pl)=>{
+const phOf=(date,start,cl,pl,pmsOffset)=>{
   if(!start)return"none";
   const d=((dif(date,start)%cl)+cl)%cl,ov=cl-14;
+  const ps=pmsOffset!=null?pmsOffset:cl-5;
   if(d<pl)return"period";
   if(d<ov-5)return"follicular";
   if(d<=ov+2)return"ovulation";
-  if(d<cl-5)return"luteal";
+  if(d<ps)return"luteal";
   return"pms";
 };
 const isPeak=(date,start,cl)=>!!start&&((dif(date,start)%cl)+cl)%cl===cl-14;
@@ -92,8 +93,9 @@ export default function ShareCycle(){
   const today=useMemo(()=>toD(new Date()),[]);
   const ad=pv?{nm:pv.nm||"",lp:pv.lp,cl:pv.cl||28,pl:pv.pl||5,lps:"",mode:pv.mode||"full"}:{nm,lp,cl,pl,lps,mode:"full"};
   const as=ad.lp?parse(ad.lp):null;
+  const pmsOffset=ad.lps&&as?(((dif(parse(ad.lps),as)%ad.cl)+ad.cl)%ad.cl):null;
   const fd=sel||today,itd=dif(fd,today)===0;
-  const ph=phOf(fd,as,ad.cl,ad.pl);
+  const ph=phOf(fd,as,ad.cl,ad.pl,pmsOffset);
   const fdc=cycDay(fd,as,ad.cl);
   const np=nextPer(as,ad.cl,fd),du=np?dif(np,fd):null;
   const no=nextOvu(as,ad.cl,fd),dto=no?dif(no,fd):null;
@@ -172,12 +174,12 @@ export default function ShareCycle(){
     const dayCells=[];
     for(let ci=0;ci<cells.length;ci++){
       const{date,in:inM}=cells[ci];
-      const p=as?phOf(date,as,ad.cl,ad.pl):"none";
+      const p=as?phOf(date,as,ad.cl,ad.pl,pmsOffset):"none";
       const pk=as&&isPeak(date,as,ad.cl);
       const cdNum=as&&inM?cycDay(date,as,ad.cl):null;
       const solidPeriod=p==="period"&&as&&dif(date,as)>=0&&dif(date,as)<ad.pl;
       const lpsParsed=ad.lps?parse(ad.lps):null;
-      const solidPMS=p==="pms"&&lpsParsed&&dif(date,lpsParsed)>=0&&dif(date,lpsParsed)<5;
+      const solidPMS=p==="pms"&&lpsParsed&&dif(date,lpsParsed)>=0;
       const fertile=as&&isFertile(date,as,ad.cl);
       const isT=dif(date,today)===0,isSel=sel&&dif(date,sel)===0;
       const vis=(p==="period"&&spd)||(p==="follicular"&&sfl)||(p==="ovulation"&&sov)||(p==="luteal"&&slt)||(p==="pms"&&spm);
