@@ -194,10 +194,10 @@ export default function ShareCycle(){
       if(isSel)border=`2.5px solid ${T.coral}`;
       dayCells.push(
         <button key={ci} data-date={iso(date)} onClick={()=>setSel(isSel?null:date)} onTouchStart={e=>{const d=e.currentTarget.getAttribute("data-date");if(d)startLP(d);}} onTouchEnd={cancelLP} onTouchMove={cancelLP} onContextMenu={e=>{e.preventDefault();const d=e.currentTarget.getAttribute("data-date");if(d){startLP(d);setTimeout(cancelLP,10);}}} style={{aspectRatio:"1/1",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",borderRadius:11,background:bg,border,opacity:inM?1:.3,position:"relative",fontFamily:F,cursor:"pointer",boxShadow:isSel?`0 0 0 3px ${T.coral}44`:"none",userSelect:"none",WebkitUserSelect:"none"}}>
-          {cdNum&&<span style={{position:"absolute",top:2,right:3,fontSize:8,fontWeight:600,color:dayCol,opacity:.55,lineHeight:1,fontFamily:F}}>{cdNum}</span>}
-          <span style={{fontSize:13,fontWeight:fw,color:dayCol,lineHeight:1}}>{date.getDate()}</span>
-          {pk&&show&&<span style={{fontSize:10,lineHeight:1,marginTop:1,color:T.gold}}>✿</span>}
-          {fertile&&show&&sov&&<span style={{fontSize:8,lineHeight:1,marginTop:1,color:T.gold,opacity:.6}}>✿</span>}
+          {cdNum&&<span style={{position:"absolute",top:2,right:3,fontSize:9,fontWeight:600,color:dayCol,opacity:.55,lineHeight:1,fontFamily:F}}>{cdNum}</span>}
+          <span style={{fontSize:15,fontWeight:fw,color:dayCol,lineHeight:1}}>{date.getDate()}</span>
+          {pk&&show&&<span style={{fontSize:12,lineHeight:1,marginTop:1,color:T.gold}}>✿</span>}
+          {fertile&&show&&sov&&<span style={{fontSize:10,lineHeight:1,marginTop:1,color:T.gold,opacity:.6}}>✿</span>}
         </button>
       );
     }
