@@ -186,7 +186,7 @@ export default function ShareCycle(){
         else if(p==="follicular")bg=T.follicular+"22";
         else if(p==="ovulation")bg=`radial-gradient(ellipse at 50% 40%,${T.gold}44 0%,${T.gold}0a 100%)`;
         else if(p==="luteal")bg=T.luteal+"22";
-        else if(p==="pms")bg=T.mauve+"28";
+        else if(p==="pms")bg=T.mauve+"55";
         fw=600;
       }
       if(p==="period"&&solidPeriod&&show){dayCol="#fff";fw=700;}
@@ -234,7 +234,7 @@ export default function ShareCycle(){
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0;-webkit-touch-callout:none;user-select:none;-webkit-user-select:none;}html,body{background:${T.bg};overflow-x:hidden;}button{cursor:pointer;border:none;background:none;}input,textarea{user-select:text;-webkit-user-select:text;}@keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}@keyframes slideUpBanner{from{transform:translateX(-50%) translateY(20px);opacity:0}to{transform:translateX(-50%) translateY(0);opacity:1}}`}</style>
 
       {/* Nav */}
-      <nav style={{display:"grid",gridTemplateColumns:"52px 1fr 110px",alignItems:"center",padding:"12px 14px",borderBottom:`1px solid ${T.line}`,position:"sticky",top:0,zIndex:50,background:T.bg+"F0",backdropFilter:"blur(16px)"}}>
+      <nav style={{display:"grid",gridTemplateColumns:"52px 1fr 110px",alignItems:"center",padding:"12px 14px",paddingTop:"calc(12px + env(safe-area-inset-top))",borderBottom:`1px solid ${T.line}`,position:"sticky",top:0,zIndex:50,background:T.bg+"F0",backdropFilter:"blur(16px)"}}>
         <img src="/sharecycle-symbol.png" alt="ShareCycle" width="34" height="34" style={{display:"block",objectFit:"contain"}}/>
         <div style={{textAlign:"center"}}>
           {ad.nm
