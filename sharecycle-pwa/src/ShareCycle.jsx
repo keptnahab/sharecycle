@@ -73,8 +73,7 @@ export default function ShareCycle(){
   const[sSh,setSSh]=useState(false);
   const[sm,setSm]=useState("full");
   const[cp,setCp]=useState(false);
-  const[lpConfirm,setLpConfirm]=useState(null);
-  const[lpPmsConfirm,setLpPmsConfirm]=useState(null);
+  const[lpChoice,setLpChoice]=useState(null);
   const lpTimer=React.useRef(null);
   const[lps,setLps]=useState("");
   const[pv,setPv]=useState(null);
@@ -156,16 +155,11 @@ export default function ShareCycle(){
   const GRP={background:T.card2,borderRadius:16,overflow:"hidden"};
   const ROW={display:"flex",justifyContent:"space-between",alignItems:"center",padding:"13px 16px",minHeight:48,borderBottom:`1px solid ${T.line}`};
 
-  const startLP=(isoStr,phase)=>{
+  const startLP=(isoStr)=>{
     cancelLP();
-    lpTimer.current=setTimeout(()=>{
-      if(phase==="pms")setLpPmsConfirm(isoStr);
-      else setLpConfirm(isoStr);
-    },700);
+    lpTimer.current=setTimeout(()=>setLpChoice(isoStr),700);
   };
   const cancelLP=()=>{if(lpTimer.current){clearTimeout(lpTimer.current);lpTimer.current=null;}};
-  const confirmLP=()=>{if(lpConfirm){setLp(lpConfirm);setSel(null);setLpConfirm(null);}};
-  const confirmPmsLP=()=>{if(lpPmsConfirm){setLps(lpPmsConfirm);setSel(null);setLpPmsConfirm(null);}};
 
   // Build calendar cells array (no JSX in map)
   const calCells=[];
@@ -179,7 +173,8 @@ export default function ShareCycle(){
       const cdNum=as&&inM?cycDay(date,as,ad.cl):null;
       const solidPeriod=p==="period"&&as&&dif(date,as)>=0&&dif(date,as)<ad.pl;
       const lpsParsed=ad.lps?parse(ad.lps):null;
-      const solidPMS=p==="pms"&&lpsParsed&&dif(date,lpsParsed)>=0;
+      const pmsLen=pmsOffset!=null?ad.cl-pmsOffset:5;
+      const solidPMS=p==="pms"&&lpsParsed&&dif(date,lpsParsed)>=0&&dif(date,lpsParsed)<pmsLen;
       const fertile=as&&isFertile(date,as,ad.cl);
       const isT=dif(date,today)===0,isSel=sel&&dif(date,sel)===0;
       const vis=(p==="period"&&spd)||(p==="follicular"&&sfl)||(p==="ovulation"&&sov)||(p==="luteal"&&slt)||(p==="pms"&&spm);
@@ -202,7 +197,7 @@ export default function ShareCycle(){
       if(isT)border=`2.5px solid ${T.ink}`;
       if(isSel)border=`2.5px solid ${T.coral}`;
       dayCells.push(
-        <button key={ci} data-date={iso(date)} data-phase={p} onClick={()=>setSel(isSel?null:date)} onTouchStart={e=>{const d=e.currentTarget.getAttribute("data-date");const ph=e.currentTarget.getAttribute("data-phase");if(d)startLP(d,ph);}} onTouchEnd={cancelLP} onTouchMove={cancelLP} onMouseDown={e=>{if(e.button!==0)return;const d=e.currentTarget.getAttribute("data-date");const ph=e.currentTarget.getAttribute("data-phase");if(d)startLP(d,ph);}} onMouseUp={cancelLP} onMouseLeave={cancelLP} onContextMenu={e=>{e.preventDefault();const d=e.currentTarget.getAttribute("data-date");const ph=e.currentTarget.getAttribute("data-phase");if(d){if(ph==="pms")setLpPmsConfirm(d);else setLpConfirm(d);}}} style={{aspectRatio:"1/1",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",borderRadius:11,background:bg,border,opacity:inM?1:.3,position:"relative",fontFamily:F,cursor:"pointer",boxShadow:isSel?`0 0 0 3px ${T.coral}44`:"none",userSelect:"none",WebkitUserSelect:"none"}}>
+        <button key={ci} data-date={iso(date)} onClick={()=>setSel(isSel?null:date)} onTouchStart={e=>{const d=e.currentTarget.getAttribute("data-date");if(d)startLP(d);}} onTouchEnd={cancelLP} onTouchMove={cancelLP} onMouseDown={e=>{if(e.button!==0)return;const d=e.currentTarget.getAttribute("data-date");if(d)startLP(d);}} onMouseUp={cancelLP} onMouseLeave={cancelLP} onContextMenu={e=>{e.preventDefault();const d=e.currentTarget.getAttribute("data-date");if(d)setLpChoice(d);}} style={{aspectRatio:"1/1",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",borderRadius:11,background:bg,border,opacity:inM?1:.3,position:"relative",fontFamily:F,cursor:"pointer",boxShadow:isSel?`0 0 0 3px ${T.coral}44`:"none",userSelect:"none",WebkitUserSelect:"none"}}>
           {cdNum&&<span style={{position:"absolute",top:2,right:3,fontSize:12,fontWeight:600,color:dayCol,opacity:.65,lineHeight:1,fontFamily:F}}>{cdNum}</span>}
           <span style={{fontSize:15,fontWeight:fw,color:dayCol,lineHeight:1}}>{date.getDate()}</span>
           {pk&&show&&<span style={{fontSize:12,lineHeight:1,marginTop:1,color:T.gold}}>✿</span>}
@@ -479,35 +474,29 @@ export default function ShareCycle(){
           </div>
         </div>
       )}
-      {/* Long-press confirm banner — Periode */}
-      {lpConfirm&&(
-        <div style={{position:"fixed",bottom:32,left:"50%",transform:"translateX(-50%)",zIndex:300,
-          background:T.coral,borderRadius:18,padding:"14px 20px",boxShadow:"0 4px 24px rgba(0,0,0,.4)",
-          display:"flex",flexDirection:"column",alignItems:"center",gap:10,minWidth:280,maxWidth:360,
-          animation:"slideUpBanner .22s cubic-bezier(.22,1,.36,1)"}}>
-          <span style={{fontSize:14,fontWeight:600,color:"#fff",fontFamily:F,textAlign:"center"}}>
-            Periodenbeginn setzen auf{" "}
-            <span style={{fontWeight:800}}>{parse(lpConfirm).toLocaleDateString("de-DE",{day:"2-digit",month:"long"})}</span>?
-          </span>
-          <div style={{display:"flex",gap:10,width:"100%"}}>
-            <button onClick={()=>setLpConfirm(null)} style={{flex:1,padding:"9px 0",borderRadius:12,background:"rgba(255,255,255,.25)",color:"#fff",fontSize:14,fontWeight:600,fontFamily:F}}>Abbrechen</button>
-            <button onClick={confirmLP} style={{flex:1,padding:"9px 0",borderRadius:12,background:"#fff",color:T.coral,fontSize:14,fontWeight:700,fontFamily:F}}>Setzen</button>
-          </div>
-        </div>
-      )}
-      {/* Long-press confirm banner — PMS */}
-      {lpPmsConfirm&&(
-        <div style={{position:"fixed",bottom:32,left:"50%",transform:"translateX(-50%)",zIndex:300,
-          background:T.mauve,borderRadius:18,padding:"14px 20px",boxShadow:"0 4px 24px rgba(0,0,0,.4)",
-          display:"flex",flexDirection:"column",alignItems:"center",gap:10,minWidth:280,maxWidth:360,
-          animation:"slideUpBanner .22s cubic-bezier(.22,1,.36,1)"}}>
-          <span style={{fontSize:14,fontWeight:600,color:"#fff",fontFamily:F,textAlign:"center"}}>
-            PMS-Beginn setzen auf{" "}
-            <span style={{fontWeight:800}}>{parse(lpPmsConfirm).toLocaleDateString("de-DE",{day:"2-digit",month:"long"})}</span>?
-          </span>
-          <div style={{display:"flex",gap:10,width:"100%"}}>
-            <button onClick={()=>setLpPmsConfirm(null)} style={{flex:1,padding:"9px 0",borderRadius:12,background:"rgba(255,255,255,.25)",color:"#fff",fontSize:14,fontWeight:600,fontFamily:F}}>Abbrechen</button>
-            <button onClick={confirmPmsLP} style={{flex:1,padding:"9px 0",borderRadius:12,background:"#fff",color:T.mauve,fontSize:14,fontWeight:700,fontFamily:F}}>Setzen</button>
+      {/* Long-press choice modal */}
+      {lpChoice&&(
+        <div style={{...OV,animation:"fadeIn .2s"}} onClick={()=>setLpChoice(null)}>
+          <div style={{...SB,padding:"0 18px 28px",animation:"slideUp .28s cubic-bezier(.22,1,.36,1)"}} onClick={e=>e.stopPropagation()}>
+            <div style={HDL}/>
+            <div style={{textAlign:"center",fontSize:15,fontWeight:600,color:T.ink2,fontFamily:F,paddingBottom:16}}>
+              {parse(lpChoice).toLocaleDateString("de-DE",{weekday:"long",day:"2-digit",month:"long"})}
+            </div>
+            <button onClick={()=>{setLp(lpChoice);setSel(null);setLpChoice(null);}} style={{display:"flex",alignItems:"center",gap:12,width:"100%",background:T.coral+"22",border:`1.5px solid ${T.coral}55`,borderRadius:16,padding:"14px 18px",marginBottom:10,cursor:"pointer",fontFamily:F}}>
+              <span style={{fontSize:22}}>🩸</span>
+              <div style={{textAlign:"left"}}>
+                <div style={{fontSize:15,fontWeight:700,color:T.coral,fontFamily:F}}>Periodenbeginn setzen</div>
+                <div style={{fontSize:12,color:T.muted,fontFamily:F,marginTop:2}}>Starttag der Periode eintragen</div>
+              </div>
+            </button>
+            <button onClick={()=>{setLps(lpChoice);setSel(null);setLpChoice(null);}} style={{display:"flex",alignItems:"center",gap:12,width:"100%",background:T.mauve+"22",border:`1.5px solid ${T.mauve}55`,borderRadius:16,padding:"14px 18px",marginBottom:10,cursor:"pointer",fontFamily:F}}>
+              <span style={{fontSize:22}}>🌙</span>
+              <div style={{textAlign:"left"}}>
+                <div style={{fontSize:15,fontWeight:700,color:T.mauve,fontFamily:F}}>PMS-Beginn setzen</div>
+                <div style={{fontSize:12,color:T.muted,fontFamily:F,marginTop:2}}>Tatsächlichen PMS-Start eintragen</div>
+              </div>
+            </button>
+            <button onClick={()=>setLpChoice(null)} style={{display:"block",width:"100%",padding:"12px 0",borderRadius:16,background:T.card2,color:T.muted,fontSize:14,fontWeight:600,fontFamily:F,border:"none",cursor:"pointer"}}>Abbrechen</button>
           </div>
         </div>
       )}
