@@ -185,9 +185,9 @@ export default function ShareCycle(){
       if(show){
         if(p==="period"&&solidPeriod)bg=T.coral;
         else if(p==="period")bg=`repeating-linear-gradient(0deg,${T.coral}22 0,${T.coral}22 3px,${T.coral} 3px,${T.coral} 4.5px)`;
-        else if(p==="follicular")bg=T.follicular+"22";
+        else if(p==="follicular")bg=T.follicular+"55";
         else if(p==="ovulation")bg=`radial-gradient(ellipse at 50% 40%,${T.gold}44 0%,${T.gold}0a 100%)`;
-        else if(p==="luteal")bg=T.luteal+"22";
+        else if(p==="luteal")bg=T.luteal+"55";
         else if(p==="pms"&&solidPMS)bg=T.mauve;
         else if(p==="pms")bg=`repeating-linear-gradient(0deg,${T.mauve}22 0,${T.mauve}22 3px,${T.mauve} 3px,${T.mauve} 4.5px)`;
         fw=600;
