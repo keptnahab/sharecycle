@@ -42,13 +42,20 @@ const isFertile=(date,start,cl)=>{if(!start)return false;const d=((dif(date,star
 const cycDay=(date,start,cl)=>start?(((dif(date,start)%cl)+cl)%cl)+1:null;
 const nextPer=(start,cl,ref)=>{if(!start)return null;const t=ref?toD(ref):toD(new Date());let n=toD(start);while(n<=t)n=addD(n,cl);return n;};
 const nextOvu=(start,cl,ref)=>{if(!start)return null;const t=ref?toD(ref):toD(new Date());let b=toD(start);while(addD(b,cl)<=t)b=addD(b,cl);const o=addD(b,cl-14);return o>=t?o:addD(addD(b,cl),cl-14);};
-const encShare=(d,m)=>btoa(unescape(encodeURIComponent(JSON.stringify({...d,mode:m}))));
+const encShare=(d,sp,sxt)=>btoa(unescape(encodeURIComponent(JSON.stringify({...d,sp,sxt}))));
 const decShare=h=>{try{return JSON.parse(decodeURIComponent(escape(atob(h))));}catch{return null;}};
 const loadLS=()=>{try{const r=localStorage.getItem(SK);return r?JSON.parse(r):null;}catch{return null;}};
 const saveLS=s=>{try{localStorage.setItem(SK,JSON.stringify(s));}catch{}};
 const pxy=(cx,cy,r,a)=>{const rad=(a-90)*Math.PI/180;return{x:cx+r*Math.cos(rad),y:cy+r*Math.sin(rad)};};
 
 const PLBL={period:"Periode",follicular:"Follikelphase",ovulation:"Eisprung",luteal:"Lutealphase",pms:"PMS",none:"—"};
+const PTXT={
+  period:"Sie hat ihre Periode. Ein bisschen Rücksicht tut jetzt gut.",
+  follicular:"Energie und Laune steigen — gute Zeit für gemeinsame Pläne.",
+  ovulation:"Energie-Hoch — ein schöner Moment für Nähe.",
+  luteal:"Die Energie lässt langsam nach — etwas mehr Ruhe tut gut.",
+  pms:"PMS-Phase: Stimmungsschwankungen sind normal. Geduld hilft am meisten."
+};
 const dTxt=v=>v===0?"Heute":v===1?"Morgen":v===-1?"Gestern":v!=null?(v<0?`vor ${-v}d`:`in ${v}d`):"—";
 
 export default function ShareCycle(){
@@ -71,7 +78,8 @@ export default function ShareCycle(){
   const[sDp,setSDp]=useState(false);
   const[sNm,setSNm]=useState(false);
   const[sSh,setSSh]=useState(false);
-  const[sm,setSm]=useState("full");
+  const[sp,setSp]=useState({period:true,follicular:false,ovulation:true,luteal:false,pms:true});
+  const[sxt,setSxt]=useState(true);
   const[cp,setCp]=useState(false);
   const[lpChoice,setLpChoice]=useState(null);
   const lpTimer=React.useRef(null);
@@ -90,7 +98,7 @@ export default function ShareCycle(){
 
   const T=dk?DK:LK;
   const today=useMemo(()=>toD(new Date()),[]);
-  const ad=pv?{nm:pv.nm||"",lp:pv.lp,cl:pv.cl||28,pl:pv.pl||5,lps:"",mode:pv.mode||"full"}:{nm,lp,cl,pl,lps,mode:"full"};
+  const ad=pv?{nm:pv.nm||"",lp:pv.lp,cl:pv.cl||28,pl:pv.pl||5,lps:"",sp:pv.sp||{period:true,follicular:true,ovulation:true,luteal:true,pms:true},sxt:pv.sxt!==false}:{nm,lp,cl,pl,lps,sp:{period:true,follicular:true,ovulation:true,luteal:true,pms:true},sxt:true};
   const as=ad.lp?parse(ad.lp):null;
   const pmsOffset=ad.lps&&as?(((dif(parse(ad.lps),as)%ad.cl)+ad.cl)%ad.cl):null;
   const fd=sel||today,itd=dif(fd,today)===0;
@@ -98,7 +106,6 @@ export default function ShareCycle(){
   const fdc=cycDay(fd,as,ad.cl);
   const np=nextPer(as,ad.cl,fd),du=np?dif(np,fd):null;
   const no=nextOvu(as,ad.cl,fd),dto=no?dif(no,fd):null;
-  const showFull=!pv||ad.mode==="full";
 
   const pCol=c=>c==="period"?T.coral:c==="ovulation"?T.gold:c==="pms"?T.mauve:c==="follicular"?T.follicular:c==="luteal"?T.luteal:T.muted;
   const pc=pCol(ph);
@@ -122,8 +129,8 @@ export default function ShareCycle(){
     return r;
   },[today]);
 
-  const slink=useMemo(()=>lp?`${location.origin}${location.pathname}#p=${encShare({nm,lp,cl,pl},sm)}`:"",
-    [nm,lp,cl,pl,sm]);
+  const slink=useMemo(()=>lp?`${location.origin}${location.pathname}#p=${encShare({nm,lp,cl,pl},sp,sxt)}`:"",
+    [nm,lp,cl,pl,sp,sxt]);
 
   const dlIcal=()=>{
     if(!as)return;
@@ -178,7 +185,7 @@ export default function ShareCycle(){
       const fertile=as&&isFertile(date,as,ad.cl);
       const isT=dif(date,today)===0,isSel=sel&&dif(date,sel)===0;
       const vis=(p==="period"&&spd)||(p==="follicular"&&sfl)||(p==="ovulation"&&sov)||(p==="luteal"&&slt)||(p==="pms"&&spm);
-      const partOk=!pv||ad.mode==="full"||p==="period"||p==="ovulation";
+      const partOk=!pv||ad.sp[p]!==false;
       const show=vis&&partOk;
       const pcol=pCol(p);
       let bg=T.card,border="none",dayCol=T.ink,fw=400;
@@ -286,19 +293,20 @@ export default function ShareCycle(){
             <div style={{height:6,borderRadius:3,background:T.card3,marginBottom:10,overflow:"hidden"}}>
               <div style={{height:"100%",width:`${Math.round((fdc/ad.cl)*100)}%`,borderRadius:3,background:pc,transition:"width .3s"}}/>
             </div>
+            {pv&&ad.sxt&&ad.sp[ph]!==false&&PTXT[ph]&&<div style={{fontSize:12,color:T.ink2,lineHeight:1.4,marginTop:8,fontFamily:F}}>{PTXT[ph]}</div>}
             {/* Row 2: facts */}
             <div style={{display:"flex",gap:0}}>
               <div style={{flex:1,borderRight:`1px solid ${T.line}`}}>
                 <div style={{fontSize:15,fontWeight:700,color:T.ink,fontFamily:F,lineHeight:1}}>{dTxt(du)}</div>
                 <div style={{fontSize:9,fontWeight:700,letterSpacing:".08em",textTransform:"uppercase",color:T.muted,fontFamily:F,marginTop:2}}>Nächste Periode</div>
               </div>
-              {showFull&&dto!=null&&(
+              {(!pv||ad.sp.ovulation)&&dto!=null&&(
                 <div style={{flex:1,paddingLeft:14}}>
                   <div style={{fontSize:15,fontWeight:700,color:T.gold,fontFamily:F,lineHeight:1}}>{dTxt(dto)}</div>
                   <div style={{fontSize:9,fontWeight:700,letterSpacing:".08em",textTransform:"uppercase",color:T.muted,fontFamily:F,marginTop:2}}>Eisprung</div>
                 </div>
               )}
-              {!(showFull&&dto!=null)&&(
+              {!((!pv||ad.sp.ovulation)&&dto!=null)&&(
                 <div style={{flex:1,paddingLeft:14}}>
                   <div style={{fontSize:15,fontWeight:700,color:T.ink2,fontFamily:F,lineHeight:1}}>{fdc}/{ad.cl}</div>
                   <div style={{fontSize:9,fontWeight:700,letterSpacing:".08em",textTransform:"uppercase",color:T.muted,fontFamily:F,marginTop:2}}>Zyklustag</div>
@@ -443,13 +451,32 @@ export default function ShareCycle(){
               <button onClick={()=>setSSh(false)} style={{color:T.coral,fontSize:16,fontWeight:600,fontFamily:F}}>Fertig</button>
             </div>
             <div style={{fontSize:11,fontWeight:700,letterSpacing:".1em",textTransform:"uppercase",color:T.muted,margin:"0 2px 6px",fontFamily:F}}>PARTNER-LINK</div>
-            <p style={{fontSize:13,color:T.ink2,marginBottom:12,lineHeight:1.5,fontFamily:F}}>Kein Server, kein Konto. Link kopieren, fertig.</p>
-            <div style={{display:"flex",background:T.card2,borderRadius:12,padding:3,marginBottom:8}}>
-              <button onClick={()=>setSm("full")} style={{flex:1,padding:"8px 10px",fontSize:13,fontWeight:sm==="full"?700:500,color:sm==="full"?T.ink:T.ink2,borderRadius:9,background:sm==="full"?T.card3:"transparent",fontFamily:F}}>Vollständig</button>
-              <button onClick={()=>setSm("minimal")} style={{flex:1,padding:"8px 10px",fontSize:13,fontWeight:sm==="minimal"?700:500,color:sm==="minimal"?T.ink:T.ink2,borderRadius:9,background:sm==="minimal"?T.card3:"transparent",fontFamily:F}}>Minimal</button>
+            <p style={{fontSize:13,color:T.ink2,marginBottom:12,lineHeight:1.5,fontFamily:F}}>Wähle, was dein Partner sehen soll.</p>
+            <div style={GRP}>
+              {[["period",T.coral,"Periode"],["follicular",T.follicular,"Follikelphase"],["ovulation",T.gold,"Eisprung"],["luteal",T.luteal,"Lutealphase"],["pms",T.mauve,"PMS"]].map(([k,col,lbl],i,arr)=>{
+                return <div key={k} style={{...ROW,borderBottom:i===arr.length-1?"none":ROW.borderBottom}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <div style={{width:9,height:9,borderRadius:"50%",background:col}}/>
+                    <span style={{fontSize:16,color:T.ink,fontFamily:F}}>{lbl}</span>
+                  </div>
+                  <div onClick={()=>setSp(o=>({...o,[k]:!o[k]}))} style={{width:50,height:30,borderRadius:15,background:sp[k]?T.coral:T.card3,cursor:"pointer",position:"relative",transition:"background .2s"}}>
+                    <div style={{position:"absolute",top:3,left:sp[k]?23:3,width:24,height:24,borderRadius:"50%",background:"#fff",transition:"left .2s",boxShadow:"0 1px 4px rgba(0,0,0,.3)"}}/>
+                  </div>
+                </div>;
+              })}
             </div>
-            <p style={{fontSize:12,color:T.muted,textAlign:"center",marginBottom:10,fontFamily:F}}>{sm==="full"?"Alle Phasen & Daten":"Nur Periode & Eisprung"}</p>
-            <div style={{background:T.card2,borderRadius:12,marginBottom:4}}>
+            <div style={{...GRP,marginTop:10}}>
+              <div style={{...ROW,borderBottom:"none"}}>
+                <div>
+                  <div style={{fontSize:16,color:T.ink,fontFamily:F}}>Partner-Infos</div>
+                  <div style={{fontSize:12,color:T.muted,marginTop:2,fontFamily:F}}>Kurzer Hinweis, wie er unterstützen kann</div>
+                </div>
+                <div onClick={()=>setSxt(v=>!v)} style={{width:50,height:30,borderRadius:15,background:sxt?T.coral:T.card3,cursor:"pointer",position:"relative",transition:"background .2s"}}>
+                  <div style={{position:"absolute",top:3,left:sxt?23:3,width:24,height:24,borderRadius:"50%",background:"#fff",transition:"left .2s",boxShadow:"0 1px 4px rgba(0,0,0,.3)"}}/>
+                </div>
+              </div>
+            </div>
+            <div style={{background:T.card2,borderRadius:12,marginTop:12,marginBottom:4}}>
               <input readOnly value={slink} onClick={e=>e.target.select()} style={{width:"100%",background:"transparent",border:"none",outline:"none",padding:"12px 14px",fontSize:11,color:T.coral,display:"block",fontFamily:"ui-monospace,monospace"}}/>
             </div>
             <button onClick={async()=>{try{await navigator.clipboard.writeText(slink);setCp(true);setTimeout(()=>setCp(false),2000);}catch{}}} style={{display:"block",width:"100%",background:T.coral,color:"#fff",fontSize:16,fontWeight:700,padding:15,borderRadius:16,border:"none",cursor:"pointer",marginTop:8,fontFamily:F}}>{cp?"✓ Kopiert!":"Link kopieren"}</button>

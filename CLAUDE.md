@@ -35,7 +35,11 @@ ShareCycle is a privacy-first menstrual cycle tracking PWA. All user data stays 
 | `encShare()` / `decShare()` | Base64-URL encode/decode cycle data for sharing |
 | `loadLS()` / `saveLS()` | Read/write the `sc-v1` localStorage entry |
 
-**URL sharing:** Share links use hash fragments (`#p=<base64>`). The app detects these on load and enters a read-only preview mode. Three privacy modes are supported: full data, period-only, ovulation-only.
+**URL sharing:** Share links use hash fragments (`#p=<base64>`). The app detects these on load and enters a read-only preview mode. The share payload is `{nm,lp,cl,pl,sp,sxt}`:
+- `sp` — object of 5 phase booleans (`period`, `follicular`, `ovulation`, `luteal`, `pms`) controlling which phases are visible to the partner
+- `sxt` — boolean toggling whether partner-friendly explanation texts are shown
+
+Older links without `sp` are treated defensively as "everything visible". The `PTXT` constant holds 5 warm, short partner-facing explanation texts (one per phase), shown only in the partner preview (hero card) when `sxt` is on and the current phase is shared.
 
 **Color theming:** Two palettes (dark `DK` / light `LK`) with phase-specific colors — period (coral), follicular (green), ovulation (gold), luteal (purple), PMS (mauve). Theme toggle is stored in `dk` inside the localStorage object.
 
