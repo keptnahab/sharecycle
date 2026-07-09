@@ -22,7 +22,7 @@ ShareCycle ist eine privacy-first Zyklus-Tracking-PWA (React/Vite, deutschsprach
 - Repo: `https://github.com/keptnahab/sharecycle.git` (Remote `origin`, bereits vorhanden — kein neues Repo nötig)
 - Branch `main`: stabiler Stand
 - Branch `feature/pms-logging`: 6 Commits vor `main`, up to date mit origin, **noch nicht gemerged** — offene Entscheidung für Michael, nicht eigenmächtig mergen
-- Die Änderungen dieser Session (Teilen-Menü-Umbau + Doku) werden vom Orchestrator im Anschluss auf einem neuen Branch `feature/partner-share-granular` (Basis: `feature/pms-logging`) committet und gepusht
+- Branch `feature/partner-share-granular` (Basis: `feature/pms-logging`): enthält die Änderungen dieser Session (Teilen-Menü-Umbau + Doku), Commit `caa0eda`. **Noch nicht gepusht** — die Sandbox hat keinen Zugriff auf die GitHub-Credentials im macOS-Schlüsselbund. Auf dem Mac ausführen: `git push -u origin feature/partner-share-granular`
 
 ## Diese Session — was gemacht wurde
 
@@ -42,5 +42,7 @@ ShareCycle ist eine privacy-first Zyklus-Tracking-PWA (React/Vite, deutschsprach
 
 ## Offene Punkte
 
+- `git push -u origin feature/partner-share-granular` auf dem Mac ausführen (Sandbox ohne Keychain-Zugriff)
 - Merge-Entscheidung `feature/pms-logging` → `main` steht noch aus
 - Apple Developer Account existiert noch nicht (Voraussetzung für App-Store-Pfad)
+- Aufräumen (im Finder löschen, in der Sandbox nicht löschbar; beides git-ignoriert bzw. außerhalb der Versionierung): `sharecycle-pwa/dist_old/` und `.git/stale-*`-Dateien
