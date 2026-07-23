@@ -98,6 +98,12 @@ export default function ShareCycle(){
 
   useEffect(()=>{if(lp)saveLS({nm,lp,cl,pl,dk,lps});},[nm,lp,cl,pl,dk,lps]);
 
+  // In a shared-link preview, initialise the phase filters to exactly what the sharer selected,
+  // so non-shared phases start hidden (and get locked/greyed in the pill row below).
+  useEffect(()=>{
+    if(pv&&pv.sp){setSpd(!!pv.sp.period);setSfl(!!pv.sp.follicular);setSov(!!pv.sp.ovulation);setSlt(!!pv.sp.luteal);setSpm(!!pv.sp.pms);}
+  },[pv]);
+
   const T=dk?DK:LK;
   const today=useMemo(()=>toD(new Date()),[]);
   const ad=pv?{nm:pv.nm||"",lp:pv.lp,cl:pv.cl||28,pl:pv.pl||5,lps:"",sp:pv.sp||{period:true,follicular:true,ovulation:true,luteal:true,pms:true},sxt:pv.sxt!==false}:{nm,lp,cl,pl,lps,sp:{period:true,follicular:true,ovulation:true,luteal:true,pms:true},sxt:true};
@@ -302,10 +308,12 @@ export default function ShareCycle(){
       {/* Phase toggles — always visible, compact pill row */}
       {as&&(
         <div style={{display:"flex",gap:6,padding:"8px 14px 6px",flexShrink:0,overflowX:"auto",borderBottom:`1px solid ${T.line}`,background:T.bg+"F0",backdropFilter:"blur(8px)"}}>
-          {[["P",spd,setSpd,T.coral,"Periode"],["F",sfl,setSfl,T.follicular,"Follikel"],["◆",sov,setSov,T.gold,"Eisprung"],["L",slt,setSlt,T.luteal,"Luteal"],["~",spm,setSpm,T.mauve,"PMS"]].map(([icon,on,set,col,tip])=>{
-            return <div key={tip} onClick={()=>set(v=>!v)} title={tip} style={{display:"flex",alignItems:"center",gap:4,padding:"5px 9px",borderRadius:999,background:on?col+"30":T.card2,border:`1px solid ${on?col:T.line2}`,cursor:"pointer",flexShrink:0,userSelect:"none"}}>
-              <div style={{width:7,height:7,borderRadius:"50%",background:on?col:T.muted}}/>
-              <span style={{fontSize:11,fontWeight:700,color:on?col:T.muted,fontFamily:F,whiteSpace:"nowrap"}}>{tip}</span>
+          {[["period",spd,setSpd,T.coral,"Periode"],["follicular",sfl,setSfl,T.follicular,"Follikel"],["ovulation",sov,setSov,T.gold,"Eisprung"],["luteal",slt,setSlt,T.luteal,"Luteal"],["pms",spm,setSpm,T.mauve,"PMS"]].map(([key,on,set,col,tip])=>{
+            const locked=pv&&ad.sp[key]===false;
+            const active=on&&!locked;
+            return <div key={tip} onClick={locked?undefined:()=>set(v=>!v)} title={locked?tip+" – nicht geteilt":tip} style={{display:"flex",alignItems:"center",gap:4,padding:"5px 9px",borderRadius:999,background:active?col+"30":T.card2,border:`1px solid ${active?col:T.line2}`,cursor:locked?"not-allowed":"pointer",flexShrink:0,userSelect:"none",opacity:locked?.3:1}}>
+              <div style={{width:7,height:7,borderRadius:"50%",background:active?col:T.muted}}/>
+              <span style={{fontSize:11,fontWeight:700,color:active?col:T.muted,fontFamily:F,whiteSpace:"nowrap"}}>{tip}</span>
             </div>;
           })}
         </div>
