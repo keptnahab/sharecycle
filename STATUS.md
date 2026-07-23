@@ -20,8 +20,8 @@ ShareCycle ist eine privacy-first Zyklus-Tracking-PWA (React/Vite, deutschsprach
 ## Git-Stand
 
 - Repo: `git@github.com:keptnahab/sharecycle.git` (Remote `origin`, SSH — nutzt den vorhandenen Mac-Key)
-- Branch `main`: **aktueller stabiler Stand, enthält beide Features unten, live.**
-- Feature-Branches `feature/pms-logging` und `feature/partner-share-granular`: **beide via PR in `main` gemergt** (PR #1 bzw. #2). Können bei Gelegenheit gelöscht werden (`git branch -d` lokal, im GitHub-UI remote).
+- Branch `main`: **aktueller stabiler Stand, enthält beide Features unten, live.** Einziger aktiver Branch.
+- Feature-Branches `feature/pms-logging` und `feature/partner-share-granular`: via PR in `main` gemergt (PR #1 bzw. #2) und danach **lokal + remote gelöscht** (2026-07-23).
 - **Arbeitssurface:** Git-/Terminal-Arbeit läuft im **Claude-Code-Tab** (lokaler Mac-Prozess, Zugriff auf SSH/Keychain), nicht in der Cowork-Sandbox. Push/Pull/PRs funktionieren hier direkt (`gh` authentifiziert). Hintergrund siehe CLAUDE.md.
 
 ## Zuletzt gemergt (Session 2026-07-23)
@@ -32,6 +32,5 @@ ShareCycle ist eine privacy-first Zyklus-Tracking-PWA (React/Vite, deutschsprach
 
 ## Nächste Schritte / offene Punkte
 
-- **Gemergte Feature-Branches aufräumen** (optional): `feature/pms-logging`, `feature/partner-share-granular` lokal + remote löschen.
 - **Apple Developer Account** existiert noch nicht — Voraussetzung für den App-Store-Pfad (Checkliste in APPSTORE.md: Bundle-ID, Capacitor-Wrapper, Screenshots stehen aus).
 - Keine offenen Merge-/Push-Entscheidungen mehr — `main` ist der einzige aktive Stand.
