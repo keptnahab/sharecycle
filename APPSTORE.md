@@ -2,6 +2,8 @@
 
 Stand: 2026-07-09. Diese Datei ist Doku/Checkliste für eine spätere Einreichung im Apple App Store. Es wurde noch kein nativer Wrapper und kein Xcode-Projekt gebaut.
 
+**Scope-Entscheidung (2026-07-09):** Michael hat sich bewusst für "nur Doku & Checkliste" entschieden, gegen "Capacitor-Wrapper jetzt aufsetzen" und gegen "beides". Kein Code-Wrapper wurde also nicht vergessen, sondern ist der aktuelle Stand nach expliziter Wahl. Ebenso bewusst geklärt: Apple Developer Account existiert **noch nicht** (nicht "existiert bereits", nicht "unklar").
+
 ---
 
 ## 1. Checkliste — Was fehlt noch
@@ -102,12 +104,12 @@ Stand: 2026-07-09. Diese Datei ist Doku/Checkliste für eine spätere Einreichun
 
 ShareCycle ist eine Zyklus-Tracking-App, die konsequent auf Privatsphäre setzt: alle Daten bleiben ausschließlich auf deinem Gerät gespeichert — kein Konto, kein Server, kein Tracking.
 
-Das Besondere an ShareCycle: Du kannst deine Zyklusdaten gezielt mit deinem Partner oder deiner Partnerin teilen — per einfachem Link, wahlweise mit vollem Detailgrad, nur mit Periodendaten oder nur mit dem Eisprung-Zeitraum. So entsteht echtes Verständnis für die PMS-Phase, ohne dass du deine kompletten Gesundheitsdaten preisgeben musst. Weniger Missverständnisse, mehr Rücksichtnahme — gemeinsam durch den Zyklus.
+Das Besondere an ShareCycle: Du kannst deine Zyklusdaten gezielt mit deinem Partner oder deiner Partnerin teilen — per einfachem Link, und du wählst frei, welche Phasen sichtbar sind (Periode, Follikelphase, Eisprung, Lutealphase, PMS). Optional zeigt der Link deinem Partner kurze, warme Erklärtexte dazu, wie er in der jeweiligen Phase am besten unterstützen kann. So entsteht echtes Verständnis für die PMS-Phase, ohne dass du deine kompletten Gesundheitsdaten preisgeben musst. Weniger Missverständnisse, mehr Rücksichtnahme — gemeinsam durch den Zyklus.
 
 Funktionen:
 - Zyklus-, Perioden- und Eisprung-Vorhersage
 - Übersicht über die aktuelle Zyklusphase (Periode, Follikelphase, Eisprung, Lutealphase, PMS)
-- Teilen per Link mit einstellbarer Detailtiefe (voll / nur Periode / nur Eisprung)
+- Teilen per Link mit frei wählbaren Phasen plus optionalen partnerfreundlichen Erklärtexten
 - Helles und dunkles Farbschema
 - Vollständig offline nutzbar, keine Registrierung nötig
 - Keine Werbung, kein Datenverkauf, kein Tracking
@@ -118,12 +120,12 @@ ShareCycle richtet sich an alle, die ihren Zyklus im Blick behalten und ihre Par
 
 ShareCycle is a menstrual cycle tracker built around one principle: your data never leaves your device. No account, no server, no tracking.
 
-What sets ShareCycle apart: you can choose to share selected cycle details with your partner through a simple link — full data, period dates only, or ovulation window only. This helps your partner understand your PMS phase without you having to expose your entire health history. Less friction, more empathy — navigating the cycle together.
+What sets ShareCycle apart: you choose exactly which phases to share with your partner through a simple link — period, follicular, ovulation, luteal, PMS, individually. An optional setting adds short, warm explanation texts so your partner knows how to support you in each phase. This helps your partner understand your PMS phase without you having to expose your entire health history. Less friction, more empathy — navigating the cycle together.
 
 Features:
 - Cycle, period and ovulation predictions
 - Clear view of the current cycle phase (period, follicular, ovulation, luteal, PMS)
-- Share via link with adjustable detail level (full / period-only / ovulation-only)
+- Share via link with individually selectable phases plus optional partner-friendly explanation texts
 - Light and dark theme
 - Fully usable offline, no sign-up required
 - No ads, no data sales, no tracking
@@ -166,7 +168,7 @@ Alle von dir eingegebenen Daten (z. B. Name/Kürzel, Datum der letzten Periode, 
 ShareCycle bietet eine optionale Funktion, mit der du ausgewählte Zyklusdaten über einen von dir selbst erzeugten Link mit einer Person deiner Wahl teilen kannst. Dabei gilt:
 - Das Teilen erfolgt ausschließlich durch deine aktive, bewusste Handlung (Erzeugen und Versenden des Links).
 - Die geteilten Daten werden direkt in den Link selbst codiert (Hash-Fragment der URL) — es gibt keinen Server, über den diese Daten laufen oder gespeichert werden.
-- Du entscheidest selbst über den Detailgrad der geteilten Daten (vollständig, nur Periodendaten oder nur Eisprung-Zeitraum).
+- Du entscheidest selbst, welche Zyklusphasen (Periode, Follikelphase, Eisprung, Lutealphase, PMS) geteilt werden, und ob zusätzlich partnerfreundliche Erklärtexte angezeigt werden.
 - Sobald du einen Link teilst, trägst du die Verantwortung dafür, über welchen Kanal (z. B. Messenger) dieser Link übermittelt wird; dieser Kanal unterliegt der jeweils eigenen Datenschutzerklärung des genutzten Dienstes.
 
 **4. Keine Weitergabe an Dritte**
