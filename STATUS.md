@@ -29,6 +29,11 @@ ShareCycle ist eine privacy-first Zyklus-Tracking-PWA (React/Vite, deutschsprach
 1. **PR #1 — PMS-Logging** (`feature/pms-logging → main`): tatsächlichen PMS-Beginn eintragbar statt Schätzung „Zykluslänge − 5". Neues optionales Datenfeld `lps` (logged PMS start); `phOf()` verschiebt die Luteal→PMS-Grenze entsprechend. Long-Press öffnet ein Auswahl-Modal (🩸 Periodenbeginn / 🌙 PMS-Beginn), inkl. Desktop-Maus-Support. Geloggte PMS-Tage solid im Kalender.
 2. **PR #2 — Granulares Partner-Teilen** (`feature/partner-share-granular → main`): Teilen-Menü phasenweise umgebaut. Share-State `sp` (5 Phasen-Booleans) + `sxt` (Erklärtexte an/aus) statt altem `mode`-String. Neue Konstante `PTXT` (5 partnerfreundliche Erklärtexte). Link-Payload `#p=<base64>` trägt `{nm,lp,cl,pl,sp,sxt}`; alte Links ohne `sp` werden defensiv als „alles sichtbar" interpretiert. Default-Auswahl: Periode/Eisprung/PMS an, Follikel/Luteal aus, Erklärtexte an.
 3. **Doku nachgezogen:** `lps` im Datenmodell in CLAUDE.md dokumentiert; APPSTORE.md/README.md/CLAUDE.md auf granulares Teilen umgestellt.
+4. **PR #3 — Eisprung-Blüte + 6-Monats-Kalender** (`feature/ovulation-bloom-6month-calendar → main`): Eisprung-Symbol jetzt SVG-Blüte statt `✿` — Blütenblätter wachsen zum Eisprung hin (15→20→15px) und werden röter (blass → kräftig rot mit weißer Mitte → blass), danach wieder abnehmend. Kalender zeigt jetzt 6 Monate rückwirkend (−6 bis +11, 18 Monate); Wochentags-Kopf sticky; Auto-Scroll auf den aktuellen Monat beim Öffnen (an `document.fonts.ready` gekoppelt, damit der Webfont-Reflow den Scroll nicht verfälscht). `isPeak`/`isFertile` dadurch ungenutzt, aber als dokumentierte Utilities belassen.
+
+## Lokale Vorschau
+
+`.claude/launch.json` definiert den Dev-Server (`sharecycle-dev`, `npm run dev`, Port 5173, cwd `sharecycle-pwa`) — für die Browser-Vorschau in Claude Code bzw. lokal via `npm run dev` im `sharecycle-pwa/`-Ordner.
 
 ## Nächste Schritte / offene Punkte
 
