@@ -27,13 +27,14 @@ const iso=d=>{const x=toD(d);const y=x.getFullYear(),m=String(x.getMonth()+1).pa
 const parse=s=>{const[y,m,d]=s.split("-").map(Number);return toD(new Date(y,m-1,d));};
 const niceFmt=s=>s?parse(s).toLocaleDateString("de-DE",{day:"2-digit",month:"long",year:"numeric"}):"";
 
-const phOf=(date,start,cl,pl)=>{
+const phOf=(date,start,cl,pl,pmsOffset)=>{
   if(!start)return"none";
   const d=((dif(date,start)%cl)+cl)%cl,ov=cl-14;
+  const ps=pmsOffset!=null?pmsOffset:cl-5;
   if(d<pl)return"period";
   if(d<ov-5)return"follicular";
   if(d<=ov+2)return"ovulation";
-  if(d<cl-5)return"luteal";
+  if(d<ps)return"luteal";
   return"pms";
 };
 const isPeak=(date,start,cl)=>!!start&&((dif(date,start)%cl)+cl)%cl===cl-14;
@@ -72,26 +73,28 @@ export default function ShareCycle(){
   const[sSh,setSSh]=useState(false);
   const[sm,setSm]=useState("full");
   const[cp,setCp]=useState(false);
-  const[lpConfirm,setLpConfirm]=useState(null); // date string awaiting confirm
+  const[lpChoice,setLpChoice]=useState(null);
   const lpTimer=React.useRef(null);
+  const[lps,setLps]=useState("");
   const[pv,setPv]=useState(null);
 
   useEffect(()=>{
     const h=window.location.hash.replace(/^#/,"");
     if(h.startsWith("p=")){const d=decShare(h.slice(2));if(d?.lp){setPv(d);return;}}
     const s=loadLS();
-    if(s?.lp){setNm(s.nm||"");setLp(s.lp);setCl(s.cl||28);setPl(s.pl||5);if(s.dk!==undefined)setDk(s.dk);}
+    if(s?.lp){setNm(s.nm||"");setLp(s.lp);setCl(s.cl||28);setPl(s.pl||5);if(s.dk!==undefined)setDk(s.dk);if(s.lps)setLps(s.lps);}
     else setSSetup(true);
   },[]);
 
-  useEffect(()=>{if(lp)saveLS({nm,lp,cl,pl,dk});},[nm,lp,cl,pl,dk]);
+  useEffect(()=>{if(lp)saveLS({nm,lp,cl,pl,dk,lps});},[nm,lp,cl,pl,dk,lps]);
 
   const T=dk?DK:LK;
   const today=useMemo(()=>toD(new Date()),[]);
-  const ad=pv?{nm:pv.nm||"",lp:pv.lp,cl:pv.cl||28,pl:pv.pl||5,mode:pv.mode||"full"}:{nm,lp,cl,pl,mode:"full"};
+  const ad=pv?{nm:pv.nm||"",lp:pv.lp,cl:pv.cl||28,pl:pv.pl||5,lps:"",mode:pv.mode||"full"}:{nm,lp,cl,pl,lps,mode:"full"};
   const as=ad.lp?parse(ad.lp):null;
+  const pmsOffset=ad.lps&&as?(((dif(parse(ad.lps),as)%ad.cl)+ad.cl)%ad.cl):null;
   const fd=sel||today,itd=dif(fd,today)===0;
-  const ph=phOf(fd,as,ad.cl,ad.pl);
+  const ph=phOf(fd,as,ad.cl,ad.pl,pmsOffset);
   const fdc=cycDay(fd,as,ad.cl);
   const np=nextPer(as,ad.cl,fd),du=np?dif(np,fd):null;
   const no=nextOvu(as,ad.cl,fd),dto=no?dif(no,fd):null;
@@ -154,12 +157,9 @@ export default function ShareCycle(){
 
   const startLP=(isoStr)=>{
     cancelLP();
-    lpTimer.current=setTimeout(()=>{
-      setLpConfirm(isoStr);
-    },700);
+    lpTimer.current=setTimeout(()=>setLpChoice(isoStr),700);
   };
   const cancelLP=()=>{if(lpTimer.current){clearTimeout(lpTimer.current);lpTimer.current=null;}};
-  const confirmLP=()=>{if(lpConfirm){setLp(lpConfirm);setSel(null);setLpConfirm(null);}};
 
   // Build calendar cells array (no JSX in map)
   const calCells=[];
@@ -168,11 +168,13 @@ export default function ShareCycle(){
     const dayCells=[];
     for(let ci=0;ci<cells.length;ci++){
       const{date,in:inM}=cells[ci];
-      const p=as?phOf(date,as,ad.cl,ad.pl):"none";
+      const p=as?phOf(date,as,ad.cl,ad.pl,pmsOffset):"none";
       const pk=as&&isPeak(date,as,ad.cl);
       const cdNum=as&&inM?cycDay(date,as,ad.cl):null;
-      // Solid period: only the actual logged period (first cycle from as)
       const solidPeriod=p==="period"&&as&&dif(date,as)>=0&&dif(date,as)<ad.pl;
+      const lpsParsed=ad.lps?parse(ad.lps):null;
+      const pmsLen=pmsOffset!=null?ad.cl-pmsOffset:5;
+      const solidPMS=p==="pms"&&lpsParsed&&dif(date,lpsParsed)>=0&&dif(date,lpsParsed)<pmsLen;
       const fertile=as&&isFertile(date,as,ad.cl);
       const isT=dif(date,today)===0,isSel=sel&&dif(date,sel)===0;
       const vis=(p==="period"&&spd)||(p==="follicular"&&sfl)||(p==="ovulation"&&sov)||(p==="luteal"&&slt)||(p==="pms"&&spm);
@@ -183,17 +185,19 @@ export default function ShareCycle(){
       if(show){
         if(p==="period"&&solidPeriod)bg=T.coral;
         else if(p==="period")bg=`repeating-linear-gradient(0deg,${T.coral}22 0,${T.coral}22 3px,${T.coral} 3px,${T.coral} 4.5px)`;
-        else if(p==="follicular")bg=T.follicular+"22";
+        else if(p==="follicular")bg=T.follicular+"55";
         else if(p==="ovulation")bg=`radial-gradient(ellipse at 50% 40%,${T.gold}44 0%,${T.gold}0a 100%)`;
-        else if(p==="luteal")bg=T.luteal+"22";
-        else if(p==="pms")bg=T.mauve+"55";
+        else if(p==="luteal")bg=T.luteal+"55";
+        else if(p==="pms"&&solidPMS)bg=T.mauve;
+        else if(p==="pms")bg=`repeating-linear-gradient(0deg,${T.mauve}22 0,${T.mauve}22 3px,${T.mauve} 3px,${T.mauve} 4.5px)`;
         fw=600;
       }
       if(p==="period"&&solidPeriod&&show){dayCol="#fff";fw=700;}
+      if(p==="pms"&&solidPMS&&show){dayCol="#fff";fw=700;}
       if(isT)border=`2.5px solid ${T.ink}`;
       if(isSel)border=`2.5px solid ${T.coral}`;
       dayCells.push(
-        <button key={ci} data-date={iso(date)} onClick={()=>setSel(isSel?null:date)} onTouchStart={e=>{const d=e.currentTarget.getAttribute("data-date");if(d)startLP(d);}} onTouchEnd={cancelLP} onTouchMove={cancelLP} onContextMenu={e=>{e.preventDefault();const d=e.currentTarget.getAttribute("data-date");if(d){startLP(d);setTimeout(cancelLP,10);}}} style={{aspectRatio:"1/1",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",borderRadius:11,background:bg,border,opacity:inM?1:.3,position:"relative",fontFamily:F,cursor:"pointer",boxShadow:isSel?`0 0 0 3px ${T.coral}44`:"none",userSelect:"none",WebkitUserSelect:"none"}}>
+        <button key={ci} data-date={iso(date)} onClick={()=>setSel(isSel?null:date)} onTouchStart={e=>{const d=e.currentTarget.getAttribute("data-date");if(d)startLP(d);}} onTouchEnd={cancelLP} onTouchMove={cancelLP} onMouseDown={e=>{if(e.button!==0)return;const d=e.currentTarget.getAttribute("data-date");if(d)startLP(d);}} onMouseUp={cancelLP} onMouseLeave={cancelLP} onContextMenu={e=>{e.preventDefault();const d=e.currentTarget.getAttribute("data-date");if(d)setLpChoice(d);}} style={{aspectRatio:"1/1",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",borderRadius:11,background:bg,border,opacity:inM?1:.3,position:"relative",fontFamily:F,cursor:"pointer",boxShadow:isSel?`0 0 0 3px ${T.coral}44`:"none",userSelect:"none",WebkitUserSelect:"none"}}>
           {cdNum&&<span style={{position:"absolute",top:2,right:3,fontSize:12,fontWeight:600,color:dayCol,opacity:.65,lineHeight:1,fontFamily:F}}>{cdNum}</span>}
           <span style={{fontSize:15,fontWeight:fw,color:dayCol,lineHeight:1}}>{date.getDate()}</span>
           {pk&&show&&<span style={{fontSize:12,lineHeight:1,marginTop:1,color:T.gold}}>✿</span>}
@@ -398,7 +402,7 @@ export default function ShareCycle(){
               </div>
             </div>
             {lp&&<button onClick={()=>setSSetup(false)} style={{display:"block",width:"100%",background:T.coral,color:"#fff",fontSize:16,fontWeight:700,padding:15,borderRadius:16,border:"none",cursor:"pointer",marginTop:16,fontFamily:F}}>Speichern</button>}
-            {lp&&<button onClick={()=>{if(confirm("Alle Daten löschen?")){localStorage.removeItem(SK);setNm("");setLp("");setCl(28);setPl(5);setSSetup(true);}}} style={{display:"block",width:"100%",background:T.mauve+"22",color:"#FF453A",fontSize:15,fontWeight:500,padding:14,borderRadius:14,marginTop:10,cursor:"pointer",border:"none",fontFamily:F}}>Alle Daten löschen</button>}
+            {lp&&<button onClick={()=>{if(confirm("Alle Daten löschen?")){localStorage.removeItem(SK);setNm("");setLp("");setLps("");setCl(28);setPl(5);setSSetup(true);}}} style={{display:"block",width:"100%",background:T.mauve+"22",color:"#FF453A",fontSize:15,fontWeight:500,padding:14,borderRadius:14,marginTop:10,cursor:"pointer",border:"none",fontFamily:F}}>Alle Daten löschen</button>}
             <p style={{fontSize:12,color:T.muted,textAlign:"center",marginTop:18,lineHeight:1.5,fontFamily:F}}>Daten bleiben lokal — kein Server.</p>
           </div>
         </div>
@@ -470,19 +474,29 @@ export default function ShareCycle(){
           </div>
         </div>
       )}
-      {/* Long-press confirm banner */}
-      {lpConfirm&&(
-        <div style={{position:"fixed",bottom:32,left:"50%",transform:"translateX(-50%)",zIndex:300,
-          background:T.coral,borderRadius:18,padding:"14px 20px",boxShadow:"0 4px 24px rgba(0,0,0,.4)",
-          display:"flex",flexDirection:"column",alignItems:"center",gap:10,minWidth:280,maxWidth:360,
-          animation:"slideUpBanner .22s cubic-bezier(.22,1,.36,1)"}}>
-          <span style={{fontSize:14,fontWeight:600,color:"#fff",fontFamily:F,textAlign:"center"}}>
-            Periodenbeginn setzen auf{" "}
-            <span style={{fontWeight:800}}>{parse(lpConfirm).toLocaleDateString("de-DE",{day:"2-digit",month:"long"})}</span>?
-          </span>
-          <div style={{display:"flex",gap:10,width:"100%"}}>
-            <button onClick={()=>setLpConfirm(null)} style={{flex:1,padding:"9px 0",borderRadius:12,background:"rgba(255,255,255,.25)",color:"#fff",fontSize:14,fontWeight:600,fontFamily:F}}>Abbrechen</button>
-            <button onClick={confirmLP} style={{flex:1,padding:"9px 0",borderRadius:12,background:"#fff",color:T.coral,fontSize:14,fontWeight:700,fontFamily:F}}>Setzen</button>
+      {/* Long-press choice modal */}
+      {lpChoice&&(
+        <div style={{...OV,animation:"fadeIn .2s"}} onClick={()=>setLpChoice(null)}>
+          <div style={{...SB,padding:"0 18px 28px",animation:"slideUp .28s cubic-bezier(.22,1,.36,1)"}} onClick={e=>e.stopPropagation()}>
+            <div style={HDL}/>
+            <div style={{textAlign:"center",fontSize:15,fontWeight:600,color:T.ink2,fontFamily:F,paddingBottom:16}}>
+              {parse(lpChoice).toLocaleDateString("de-DE",{weekday:"long",day:"2-digit",month:"long"})}
+            </div>
+            <button onClick={()=>{setLp(lpChoice);setSel(null);setLpChoice(null);}} style={{display:"flex",alignItems:"center",gap:12,width:"100%",background:T.coral+"22",border:`1.5px solid ${T.coral}55`,borderRadius:16,padding:"14px 18px",marginBottom:10,cursor:"pointer",fontFamily:F}}>
+              <span style={{fontSize:22}}>🩸</span>
+              <div style={{textAlign:"left"}}>
+                <div style={{fontSize:15,fontWeight:700,color:T.coral,fontFamily:F}}>Periodenbeginn setzen</div>
+                <div style={{fontSize:12,color:T.muted,fontFamily:F,marginTop:2}}>Starttag der Periode eintragen</div>
+              </div>
+            </button>
+            <button onClick={()=>{setLps(lpChoice);setSel(null);setLpChoice(null);}} style={{display:"flex",alignItems:"center",gap:12,width:"100%",background:T.mauve+"22",border:`1.5px solid ${T.mauve}55`,borderRadius:16,padding:"14px 18px",marginBottom:10,cursor:"pointer",fontFamily:F}}>
+              <span style={{fontSize:22}}>🌙</span>
+              <div style={{textAlign:"left"}}>
+                <div style={{fontSize:15,fontWeight:700,color:T.mauve,fontFamily:F}}>PMS-Beginn setzen</div>
+                <div style={{fontSize:12,color:T.muted,fontFamily:F,marginTop:2}}>Tatsächlichen PMS-Start eintragen</div>
+              </div>
+            </button>
+            <button onClick={()=>setLpChoice(null)} style={{display:"block",width:"100%",padding:"12px 0",borderRadius:16,background:T.card2,color:T.muted,fontSize:14,fontWeight:600,fontFamily:F,border:"none",cursor:"pointer"}}>Abbrechen</button>
           </div>
         </div>
       )}
