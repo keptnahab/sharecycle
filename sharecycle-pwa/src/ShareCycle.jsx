@@ -83,6 +83,8 @@ export default function ShareCycle(){
   const[cp,setCp]=useState(false);
   const[lpChoice,setLpChoice]=useState(null);
   const lpTimer=React.useRef(null);
+  const calScrolled=React.useRef(false);
+  const curMonthRef=React.useRef(null);
   const[lps,setLps]=useState("");
   const[pv,setPv]=useState(null);
 
@@ -117,7 +119,7 @@ export default function ShareCycle(){
 
   const calM=useMemo(()=>{
     const r=[];
-    for(let o=0;o<12;o++){
+    for(let o=-6;o<12;o++){
       const m=new Date(today.getFullYear(),today.getMonth()+o,1);
       const fw=(m.getDay()+6)%7,dim=new Date(m.getFullYear(),m.getMonth()+1,0).getDate();
       const cells=[];
@@ -128,6 +130,24 @@ export default function ShareCycle(){
     }
     return r;
   },[today]);
+
+  // Auto-scroll the calendar to the current month once. Wait for the web font to load so the
+  // layout height above the current month is final before scrolling (otherwise it under-scrolls).
+  useEffect(()=>{
+    if(!ad.lp||calScrolled.current)return;
+    let raf=0;
+    const attempt=tries=>{
+      if(calScrolled.current)return;
+      const el=curMonthRef.current;
+      if(el){el.scrollIntoView({block:"start"});calScrolled.current=true;return;}
+      if(tries<60)raf=requestAnimationFrame(()=>attempt(tries+1));
+    };
+    const kick=()=>{raf=requestAnimationFrame(()=>attempt(0));};
+    let t=0;
+    if(document.fonts&&document.fonts.ready&&document.fonts.ready.then){document.fonts.ready.then(kick);t=setTimeout(kick,1500);}
+    else t=setTimeout(kick,300);
+    return()=>{cancelAnimationFrame(raf);clearTimeout(t);};
+  },[ad.lp]);
 
   const slink=useMemo(()=>lp?`${location.origin}${location.pathname}#p=${encShare({nm,lp,cl,pl},sp,sxt)}`:"",
     [nm,lp,cl,pl,sp,sxt]);
@@ -176,17 +196,23 @@ export default function ShareCycle(){
     for(let ci=0;ci<cells.length;ci++){
       const{date,in:inM}=cells[ci];
       const p=as?phOf(date,as,ad.cl,ad.pl,pmsOffset):"none";
-      const pk=as&&isPeak(date,as,ad.cl);
       const cdNum=as&&inM?cycDay(date,as,ad.cl):null;
       const solidPeriod=p==="period"&&as&&dif(date,as)>=0&&dif(date,as)<ad.pl;
       const lpsParsed=ad.lps?parse(ad.lps):null;
       const pmsLen=pmsOffset!=null?ad.cl-pmsOffset:5;
       const solidPMS=p==="pms"&&lpsParsed&&dif(date,lpsParsed)>=0&&dif(date,lpsParsed)<pmsLen;
-      const fertile=as&&isFertile(date,as,ad.cl);
       const isT=dif(date,today)===0,isSel=sel&&dif(date,sel)===0;
       const vis=(p==="period"&&spd)||(p==="follicular"&&sfl)||(p==="ovulation"&&sov)||(p==="luteal"&&slt)||(p==="pms"&&spm);
       const partOk=!pv||ad.sp[p]!==false;
       const show=vis&&partOk;
+      // Ovulation bloom: petals grow 15→20→15px and redden toward the peak day, palest at the window edges.
+      let ovSize=0,ovCol="";
+      if(show&&p==="ovulation"&&as){
+        const doff=((dif(date,as)%ad.cl)+ad.cl)%ad.cl,ovd=ad.cl-14,dd=doff-ovd;
+        const c=Math.max(0,Math.min(1,dd<=0?(dd+5)/5:(2-dd)/2));
+        ovSize=Math.round(15+c*5);
+        ovCol=`rgb(255,${Math.round(235-c*190)},${Math.round(235-c*180)})`;
+      }
       const pcol=pCol(p);
       let bg=T.card,border="none",dayCol=T.ink,fw=400;
       if(show){
@@ -207,13 +233,22 @@ export default function ShareCycle(){
         <button key={ci} data-date={iso(date)} onClick={()=>setSel(isSel?null:date)} onTouchStart={e=>{const d=e.currentTarget.getAttribute("data-date");if(d)startLP(d);}} onTouchEnd={cancelLP} onTouchMove={cancelLP} onMouseDown={e=>{if(e.button!==0)return;const d=e.currentTarget.getAttribute("data-date");if(d)startLP(d);}} onMouseUp={cancelLP} onMouseLeave={cancelLP} onContextMenu={e=>{e.preventDefault();const d=e.currentTarget.getAttribute("data-date");if(d)setLpChoice(d);}} style={{aspectRatio:"1/1",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",borderRadius:11,background:bg,border,opacity:inM?1:.3,position:"relative",fontFamily:F,cursor:"pointer",boxShadow:isSel?`0 0 0 3px ${T.coral}44`:"none",userSelect:"none",WebkitUserSelect:"none"}}>
           {cdNum&&<span style={{position:"absolute",top:2,right:3,fontSize:12,fontWeight:600,color:dayCol,opacity:.65,lineHeight:1,fontFamily:F}}>{cdNum}</span>}
           <span style={{fontSize:15,fontWeight:fw,color:dayCol,lineHeight:1}}>{date.getDate()}</span>
-          {pk&&show&&<span style={{fontSize:12,lineHeight:1,marginTop:1,color:T.gold}}>✿</span>}
-          {fertile&&show&&sov&&<span style={{fontSize:10,lineHeight:1,marginTop:1,color:T.gold,opacity:.6}}>✿</span>}
+          {ovSize>0&&(
+            <svg width={ovSize} height={ovSize} viewBox="0 0 24 24" style={{display:"block",marginTop:1}} aria-hidden="true">
+              <ellipse cx="12" cy="6.6" rx="2.7" ry="4.7" fill={ovCol} transform="rotate(0 12 12)"/>
+              <ellipse cx="12" cy="6.6" rx="2.7" ry="4.7" fill={ovCol} transform="rotate(72 12 12)"/>
+              <ellipse cx="12" cy="6.6" rx="2.7" ry="4.7" fill={ovCol} transform="rotate(144 12 12)"/>
+              <ellipse cx="12" cy="6.6" rx="2.7" ry="4.7" fill={ovCol} transform="rotate(216 12 12)"/>
+              <ellipse cx="12" cy="6.6" rx="2.7" ry="4.7" fill={ovCol} transform="rotate(288 12 12)"/>
+              <circle cx="12" cy="12" r="3.1" fill="#fff"/>
+            </svg>
+          )}
         </button>
       );
     }
+    const isCurMonth=mn===today.getMonth()&&y===today.getFullYear();
     calCells.push(
-      <div key={mi} style={{marginBottom:28}}>
+      <div key={mi} ref={isCurMonth?curMonthRef:null} style={{marginBottom:28,scrollMarginTop:52}}>
         <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:10}}>
           <span style={{fontSize:20,fontWeight:700,color:T.ink,fontFamily:F}}>{MO[mn]}</span>
           <span style={{fontSize:14,color:T.muted,fontFamily:F}}>{y}</span>
@@ -329,7 +364,7 @@ export default function ShareCycle(){
       {/* Calendar */}
       {as&&(
         <div style={{padding:"0 14px",overflowY:"auto",flex:1,paddingBottom:80}}>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:3,marginBottom:10}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:3,marginBottom:10,position:"sticky",top:0,zIndex:10,background:T.bg,paddingTop:6,paddingBottom:6}}>
             {WD.map(w=><div key={w} style={{textAlign:"center",fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:".08em",color:T.muted,padding:"3px 0",fontFamily:F}}>{w}</div>)}
           </div>
           {calCells}
