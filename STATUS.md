@@ -1,6 +1,6 @@
 # STATUS.md
 
-Stand: 2026-07-09. Lebendes Statusdokument — hier reicht ein Blick, um in einem neuen Kontextfenster sofort weiterzumachen.
+Stand: 2026-07-23. Lebendes Statusdokument — hier reicht ein Blick, um in einem neuen Kontextfenster sofort weiterzumachen.
 
 ## Projekt
 
@@ -8,7 +8,7 @@ ShareCycle ist eine privacy-first Zyklus-Tracking-PWA (React/Vite, deutschsprach
 
 **USP:** Zyklusdaten gezielt und granular mit dem Partner/der Partnerin teilen (phasenweise auswählbar), um Verständnis für PMS und den Zyklus allgemein zu schaffen — ohne die kompletten Gesundheitsdaten preiszugeben.
 
-**Live-URL:** https://sharecycleapp.netlify.app
+**Live-URL:** https://sharecycleapp.netlify.app (deployt automatisch von `main`)
 
 ## Tech-Stack
 
@@ -19,36 +19,19 @@ ShareCycle ist eine privacy-first Zyklus-Tracking-PWA (React/Vite, deutschsprach
 
 ## Git-Stand
 
-- Repo: `https://github.com/keptnahab/sharecycle.git` (Remote `origin`, bereits vorhanden — kein neues Repo nötig)
-- Branch `main`: stabiler Stand
-- Branch `feature/pms-logging`: 6 Commits vor `main`, up to date mit origin, **noch nicht gemerged** — offene Entscheidung für Michael, nicht eigenmächtig mergen
-- Branch `feature/partner-share-granular` (Basis: `feature/pms-logging`): enthält die Änderungen dieser Session (Teilen-Menü-Umbau + Doku), Commit `caa0eda`. **Noch nicht gepusht.**
-- **Push-Workflow (bewusste Entscheidung):** Die Cowork-Sandbox ist eine isolierte Linux-Umgebung ohne Zugriff auf den Mac-Schlüsselbund/SSH-Agent — anders als eine lokale Claude-Code-Session im Terminal. SSH zu GitHub ist über das Sandbox-Netzwerk technisch auch gar nicht erreichbar (nur HTTP/HTTPS freigegeben). Michael hat sich bewusst dagegen entschieden, ein GitHub-Token in der `.git/config` zu hinterlegen (würde via Dropbox mitsynchronisiert). **Michael pusht deshalb selbst lokal** — nach jeder Session am Mac ausführen: `git push -u origin <branchname>` (aktuell: `git push -u origin feature/partner-share-granular`).
+- Repo: `git@github.com:keptnahab/sharecycle.git` (Remote `origin`, SSH — nutzt den vorhandenen Mac-Key)
+- Branch `main`: **aktueller stabiler Stand, enthält beide Features unten, live.**
+- Feature-Branches `feature/pms-logging` und `feature/partner-share-granular`: **beide via PR in `main` gemergt** (PR #1 bzw. #2). Können bei Gelegenheit gelöscht werden (`git branch -d` lokal, im GitHub-UI remote).
+- **Arbeitssurface:** Git-/Terminal-Arbeit läuft im **Claude-Code-Tab** (lokaler Mac-Prozess, Zugriff auf SSH/Keychain), nicht in der Cowork-Sandbox. Push/Pull/PRs funktionieren hier direkt (`gh` authentifiziert). Hintergrund siehe CLAUDE.md.
 
-## Diese Session — was gemacht wurde
+## Zuletzt gemergt (Session 2026-07-23)
 
-1. **Teilen-Menü granular umgebaut** (`sharecycle-pwa/src/ShareCycle.jsx`, Build sauber):
-   - Alter Modus-State `sm` ("full"/"minimal") ersetzt durch `sp` (Objekt mit 5 Phasen-Booleans: `period`, `follicular`, `ovulation`, `luteal`, `pms`) plus `sxt` (Boolean, steuert ob Partner-Erklärtexte angezeigt werden)
-   - Neue Konstante `PTXT`: 5 partnerfreundliche Erklärtexte pro Phase, erscheinen nur in der Partner-Vorschau (Hero-Card), wenn `sxt` aktiv und die jeweilige Phase geteilt ist
-   - Share-Link-Payload (`#p=<base64>`) enthält jetzt `{nm,lp,cl,pl,sp,sxt}` statt des alten `mode`-Strings; alte Links ohne `sp` werden defensiv als "alles sichtbar" interpretiert
-   - Share-Sheet-UI: statt Segmented-Control "Vollständig/Minimal" jetzt ein Toggle-Switch pro Phase (mit Phasenfarbpunkt) plus ein Toggle "Partner-Infos"
-2. **APPSTORE.md** neu erstellt (Projekt-Root): Checkliste + Recherche für eine spätere App-Store-Einreichung (Apple Developer Account noch nicht vorhanden, Bundle-ID TBD, Capacitor-Wrapper TBD, Screenshots TBD). Details siehe dort.
-3. **Doku aktualisiert:** dieses STATUS.md, ROADMAP.md, CLAUDE.md (Data-Model-Abschnitt + neuer Abschnitt "Working environment & workflow preferences"), `sharecycle-pwa/README.md` (Setup-Anleitung).
-4. **Grundsatzklärung Cowork vs. Code:** Cowork (Home-Tab) und Claude Code (Code-Tab) laufen in derselben Desktop-App, aber Cowork's Shell ist eine isolierte Cloud-Sandbox ohne Zugriff auf Mac-Schlüsselbund/SSH — Code läuft dagegen direkt lokal auf dem Mac (siehe SmartMarkers-Projekt, dort bereits SSH-Key für GitHub eingerichtet). **Entscheidung: Git-/Terminal-lastige Arbeit an diesem Projekt künftig im Code-Tab, nicht in Cowork.** Beide Tabs arbeiten auf demselben Ordner auf der Platte — kein Datei-Umzug nötig, nur eine neue Code-Session auf diesen Ordner zeigen lassen. Details/Begründung in CLAUDE.md.
-5. **Agentic-Workflow-Präferenz dokumentiert** (in CLAUDE.md): bei größeren Cowork-Aufgaben `fable` als Orchestrator, der an `sonnet`-Subagenten delegiert; bei Blockaden löst der Orchestrator selbst, statt aufzugeben.
+1. **PR #1 — PMS-Logging** (`feature/pms-logging → main`): tatsächlichen PMS-Beginn eintragbar statt Schätzung „Zykluslänge − 5". Neues optionales Datenfeld `lps` (logged PMS start); `phOf()` verschiebt die Luteal→PMS-Grenze entsprechend. Long-Press öffnet ein Auswahl-Modal (🩸 Periodenbeginn / 🌙 PMS-Beginn), inkl. Desktop-Maus-Support. Geloggte PMS-Tage solid im Kalender.
+2. **PR #2 — Granulares Partner-Teilen** (`feature/partner-share-granular → main`): Teilen-Menü phasenweise umgebaut. Share-State `sp` (5 Phasen-Booleans) + `sxt` (Erklärtexte an/aus) statt altem `mode`-String. Neue Konstante `PTXT` (5 partnerfreundliche Erklärtexte). Link-Payload `#p=<base64>` trägt `{nm,lp,cl,pl,sp,sxt}`; alte Links ohne `sp` werden defensiv als „alles sichtbar" interpretiert. Default-Auswahl: Periode/Eisprung/PMS an, Follikel/Luteal aus, Erklärtexte an.
+3. **Doku nachgezogen:** `lps` im Datenmodell in CLAUDE.md dokumentiert; APPSTORE.md/README.md/CLAUDE.md auf granulares Teilen umgestellt.
 
-## Nächste Schritte
+## Nächste Schritte / offene Punkte
 
-- Im Code-Tab ein Projekt/eine Sitzung auf diesen Ordner zeigen lassen (existiert dort noch nicht in der Projektliste) — `CLAUDE.md` + `STATUS.md` geben sofort den vollen Kontext
-- Von dort: `git push -u origin feature/partner-share-granular` (ggf. vorher Remote auf SSH umstellen, siehe CLAUDE.md)
-- Michael entscheidet über Merge von `feature/pms-logging` → `main`
-- Review und ggf. Merge von `feature/partner-share-granular`
-- Bei Bedarf: App-Store-Weg gemäß APPSTORE.md angehen (siehe dort für Details/Zeitschätzung)
-
-## Offene Punkte
-
-- `git push -u origin feature/partner-share-granular` — jetzt im Code-Tab statt Cowork (s.o.)
-- Merge-Entscheidung `feature/pms-logging` → `main` steht noch aus
-- Apple Developer Account existiert noch nicht (Voraussetzung für App-Store-Pfad)
-- Aufräumen (im Finder löschen, in der Sandbox nicht löschbar; beides git-ignoriert bzw. außerhalb der Versionierung): `sharecycle-pwa/dist_old/` und `.git/stale-*`-Dateien
-- **Bekannte Cowork-Sandbox-Eigenheit (kein Code-Bug):** `npm run build` kann in der Cowork-Sandbox mit `EPERM: operation not permitted, unlink '.../dist/...'` fehlschlagen, wenn ein alter `dist/`-Ordner bereits existiert — die Dropbox-Cloud-Mount-Umgebung der Sandbox erlaubt kein Löschen bestehender Dateien (nur Anlegen). Verifiziert: Build in frisches Verzeichnis (`vite build --outDir dist_verify_test`) läuft fehlerfrei durch — der Code ist sauber. Auf dem echten Mac (natives Dateisystem) tritt das nicht auf.
+- **Gemergte Feature-Branches aufräumen** (optional): `feature/pms-logging`, `feature/partner-share-granular` lokal + remote löschen.
+- **Apple Developer Account** existiert noch nicht — Voraussetzung für den App-Store-Pfad (Checkliste in APPSTORE.md: Bundle-ID, Capacitor-Wrapper, Screenshots stehen aus).
+- Keine offenen Merge-/Push-Entscheidungen mehr — `main` ist der einzige aktive Stand.
