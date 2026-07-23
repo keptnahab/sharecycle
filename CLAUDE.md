@@ -20,8 +20,10 @@ ShareCycle is a privacy-first menstrual cycle tracking PWA. All user data stays 
 
 **Data model** (localStorage key `sc-v1`):
 ```js
-{ nm, lp, cl, pl, dk }
-// name, last-period date (ISO), cycle length (days), period length (days), dark-mode bool
+{ nm, lp, cl, pl, dk, lps }
+// name, last-period date (ISO), cycle length (days), period length (days), dark-mode bool,
+// lps = logged PMS start date (ISO, optional). When set, phOf() shifts the luteal→PMS
+// boundary to this actual start instead of the default cl-5 estimate. Absent on older data.
 ```
 
 **Core pure utilities** (all in ShareCycle.jsx):
