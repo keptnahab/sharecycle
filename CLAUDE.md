@@ -20,8 +20,10 @@ ShareCycle is a privacy-first menstrual cycle tracking PWA. All user data stays 
 
 **Data model** (localStorage key `sc-v1`):
 ```js
-{ nm, lp, cl, pl, dk }
-// name, last-period date (ISO), cycle length (days), period length (days), dark-mode bool
+{ nm, lp, cl, pl, dk, lps }
+// name, last-period date (ISO), cycle length (days), period length (days), dark-mode bool,
+// lps = logged PMS start date (ISO, optional). When set, phOf() shifts the luteal→PMS
+// boundary to this actual start instead of the default cl-5 estimate. Absent on older data.
 ```
 
 **Core pure utilities** (all in ShareCycle.jsx):
@@ -35,7 +37,15 @@ ShareCycle is a privacy-first menstrual cycle tracking PWA. All user data stays 
 | `encShare()` / `decShare()` | Base64-URL encode/decode cycle data for sharing |
 | `loadLS()` / `saveLS()` | Read/write the `sc-v1` localStorage entry |
 
-**URL sharing:** Share links use hash fragments (`#p=<base64>`). The app detects these on load and enters a read-only preview mode. Three privacy modes are supported: full data, period-only, ovulation-only.
+**URL sharing:** Share links use hash fragments (`#p=<base64>`). The app detects these on load and enters a read-only preview mode. The share payload is `{nm,lp,cl,pl,sp,sxt}`:
+- `sp` — object of 5 phase booleans (`period`, `follicular`, `ovulation`, `luteal`, `pms`) controlling which phases are visible to the partner
+- `sxt` — boolean toggling whether partner-friendly explanation texts are shown
+
+Older links without `sp` are treated defensively as "everything visible". The `PTXT` constant holds 5 warm, short partner-facing explanation texts (one per phase), shown only in the partner preview (hero card) when `sxt` is on and the current phase is shared.
+
+Default `sp` when opening the share sheet for the first time: `{period:true,follicular:false,ovulation:true,luteal:false,pms:true}` — period/ovulation/PMS are the phases most relevant to a partner, follicular/luteal are off by default. `sxt` (explanation texts) defaults to `true`.
+
+**Explicitly out of scope (decided 2026-07-09, don't re-add without asking):** a separate toggle for whether the name or future predictions are shared was considered and explicitly rejected by Michael when the granular-sharing feature was speced — only phase-selection + explanation-text toggle were requested.
 
 **Color theming:** Two palettes (dark `DK` / light `LK`) with phase-specific colors — period (coral), follicular (green), ovulation (gold), luteal (purple), PMS (mauve). Theme toggle is stored in `dk` inside the localStorage object.
 
@@ -44,3 +54,15 @@ ShareCycle is a privacy-first menstrual cycle tracking PWA. All user data stays 
 - Google Fonts are cached for 1 year via Workbox runtime caching
 - Deployed to Netlify (`netlify.toml`); all routes redirect to `index.html` for SPA routing
 - Service worker is served with `Cache-Control: no-cache` so updates are picked up immediately
+
+## Working environment & workflow preferences
+
+Michael works on this project through two different surfaces of the same Claude Desktop app:
+- **Cowork ("Home" tab):** file tools work directly on this folder, but the shell/bash tool runs in an isolated cloud sandbox — no access to the Mac's SSH agent/keychain, no outbound SSH. Good for docs, planning, non-git file work.
+- **Claude Code ("Code" tab):** runs as a real local process on Michael's Mac — full access to git, SSH, `gh` CLI, macOS Keychain. **This is the preferred surface for anything involving `git push`/`git pull`/GitHub or other terminal/credential work.** Michael already has a working SSH key registered with GitHub on this MacBook Pro (set up during the SmartMarkers project) — reuse it (`git remote set-url origin git@github.com:keptnahab/sharecycle.git` if the remote is still on HTTPS) instead of asking for tokens.
+
+Both surfaces read/write the same folder on disk — there is no "migration" step between them, just open a Code session pointed at this folder.
+
+**Agentic orchestration preference (Cowork sessions):** When a task is large enough to warrant subagents, use a `fable`-model agent as the orchestrator, which breaks the work into pieces and delegates execution to `sonnet`-model subagents (via the Agent tool). If a Sonnet subagent gets stuck or produces a bad result, the Fable orchestrator should not give up — it should diagnose the problem itself and re-issue clearer instructions (or fix it directly), continuing until everything is done, then report back a consolidated summary.
+
+**General rule:** only change what's currently being worked on — no incidental refactors. After every major decision or step, update this file and `STATUS.md` so a fresh context window can pick up immediately.

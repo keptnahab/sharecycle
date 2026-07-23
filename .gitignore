@@ -3,3 +3,4 @@
 sharecycle-pwa/node_modules
 sharecycle-pwa/dist
 sharecycle-pwa/*.local
+.claude/settings.local.json

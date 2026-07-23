@@ -2,6 +2,16 @@
 
 Dein privater Zykluskalender als Progressive Web App.
 
+## Projekt auf neuem Rechner einrichten
+
+1. Repo klonen:
+   ```bash
+   git clone https://github.com/keptnahab/sharecycle.git
+   cd sharecycle/sharecycle-pwa
+   ```
+2. Node-Version: getestet mit **v22.19.0** (nvm oder vergleichbaren Version-Manager empfohlen)
+3. Dependencies installieren und Dev-Server starten (siehe unten)
+
 ## Lokale Entwicklung
 
 ```bash
@@ -29,17 +39,15 @@ Erzeugt den deploy-fertigen `dist/`-Ordner.
 
 ### Über Git (für automatische Updates)
 
-1. GitHub-Repo erstellen und Code pushen:
-   ```bash
-   git init
-   git add .
-   git commit -m "ShareCycle v1"
-   git remote add origin https://github.com/DEIN-USER/sharecycle.git
-   git push -u origin main
-   ```
-2. Auf Netlify: "Add new site" → "Import an existing project" → GitHub
-3. Build Command: `npm run build`, Publish Directory: `dist`
-4. Bei jedem Push wird automatisch neu deployed
+Das GitHub-Repo (`https://github.com/keptnahab/sharecycle.git`) existiert bereits — einfach Änderungen committen und pushen:
+```bash
+git add .
+git commit -m "..."
+git push
+```
+1. Auf Netlify: "Add new site" → "Import an existing project" → GitHub
+2. Build Command: `npm run build`, Publish Directory: `dist`
+3. Bei jedem Push wird automatisch neu deployed
 
 ## iPhone-Installation für Testerinnen
 
