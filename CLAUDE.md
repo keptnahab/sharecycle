@@ -14,16 +14,17 @@ There are no tests or linters configured.
 
 ## Architecture
 
-ShareCycle is a privacy-first menstrual cycle tracking PWA. All user data stays in `localStorage` — no backend, no accounts. The UI is German-language (`lang="de"`).
+ShareCycle is a privacy-first menstrual cycle tracking PWA. All user data stays in `localStorage` — no backend, no accounts. The UI is **bilingual (German + English)** via an in-app language toggle (see "Internationalization" below).
 
-**Single-component architecture:** All app logic lives in [`src/ShareCycle.jsx`](sharecycle-pwa/src/ShareCycle.jsx) (~491 lines). There are intentionally no helper functions that return JSX — only plain utility functions. The main React component holds all state (~20 hooks) and renders the full UI inline.
+**Single-component architecture:** All app logic lives in [`src/ShareCycle.jsx`](sharecycle-pwa/src/ShareCycle.jsx) (~600 lines). There are intentionally no helper functions that return JSX — only plain utility functions. The main React component holds all state (~20 hooks) and renders the full UI inline.
 
 **Data model** (localStorage key `sc-v1`):
 ```js
-{ nm, lp, cl, pl, dk, lps }
+{ nm, lp, cl, pl, dk, lps, lg }
 // name, last-period date (ISO), cycle length (days), period length (days), dark-mode bool,
 // lps = logged PMS start date (ISO, optional). When set, phOf() shifts the luteal→PMS
 // boundary to this actual start instead of the default cl-5 estimate. Absent on older data.
+// lg = UI language "de" | "en" (optional). Absent on older data → treated as "de".
 ```
 
 **Core pure utilities** (all in ShareCycle.jsx):
@@ -46,6 +47,13 @@ Older links without `sp` are treated defensively as "everything visible". The `P
 Default `sp` when opening the share sheet for the first time: `{period:true,follicular:false,ovulation:true,luteal:false,pms:true}` — period/ovulation/PMS are the phases most relevant to a partner, follicular/luteal are off by default. `sxt` (explanation texts) defaults to `true`.
 
 **Explicitly out of scope (decided 2026-07-09, don't re-add without asking):** a separate toggle for whether the name or future predictions are shared was considered and explicitly rejected by Michael when the granular-sharing feature was speced — only phase-selection + explanation-text toggle were requested.
+
+**Internationalization (one codebase, both languages):** There is **no separate English build or branch** — DE and EN ship from this single file, so features are shared across languages by construction. The language mirrors the existing theme pattern (`T = dk ? DK : LK`): `const L = lg; const S = STR[L];`.
+- `STR = {de:{…}, en:{…}}` — flat dictionary of every UI string. `PLBL`, `PTXT`, `MO` (months), `WD` (weekday headers) are likewise keyed by language: `PLBL[L].period`, `MO[L][mn]`, etc.
+- `dTxt(v, L)` and `niceFmt(s, L)` take the language; date formatting uses `L==="en" ? "en-US" : "de-DE"`. Calendar stays Monday-first in both.
+- Language is auto-detected from the browser on first run (`detectLang()` → `navigator.language`), switchable in Settings → Appearance (DE/EN), persisted as `lg`. A `useEffect` keeps `document.documentElement.lang` in sync. Shared `#p=` links carry no language — each viewer sees them in their own chosen language.
+
+> **RULE — keep languages in sync (do not let them drift):** any new user-facing string MUST be added as **both** a `de` and an `en` key in `STR` (or `PLBL`/`PTXT`), never hardcoded inline. Never fork a language-specific build. When adding a feature, translating its strings is part of the same change, not a follow-up. `index.html` (`lang`, og tags) and the `vite.config.js` PWA manifest (`name`, `description`, `lang`) are English.
 
 **Color theming:** Two palettes (dark `DK` / light `LK`) with phase-specific colors — period (coral), follicular (green), ovulation (gold), luteal (purple), PMS (mauve). Theme toggle is stored in `dk` inside the localStorage object.
 
