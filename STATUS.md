@@ -4,7 +4,7 @@ Stand: 2026-07-23. Lebendes Statusdokument — hier reicht ein Blick, um in eine
 
 ## Projekt
 
-ShareCycle ist eine privacy-first Zyklus-Tracking-PWA (React/Vite, deutschsprachige UI). Alle Daten bleiben in `localStorage` — kein Backend, kein Account.
+ShareCycle ist eine privacy-first Zyklus-Tracking-PWA (React/Vite, **zweisprachige UI: Deutsch + Englisch** per In-App-Umschalter). Alle Daten bleiben in `localStorage` — kein Backend, kein Account.
 
 **USP:** Zyklusdaten gezielt und granular mit dem Partner/der Partnerin teilen (phasenweise auswählbar), um Verständnis für PMS und den Zyklus allgemein zu schaffen — ohne die kompletten Gesundheitsdaten preiszugeben.
 
@@ -31,6 +31,10 @@ ShareCycle ist eine privacy-first Zyklus-Tracking-PWA (React/Vite, deutschsprach
 3. **Doku nachgezogen:** `lps` im Datenmodell in CLAUDE.md dokumentiert; APPSTORE.md/README.md/CLAUDE.md auf granulares Teilen umgestellt.
 4. **PR #3 — Eisprung-Blüte + 6-Monats-Kalender** (`feature/ovulation-bloom-6month-calendar → main`): Eisprung-Symbol jetzt SVG-Blüte statt `✿` — Blütenblätter wachsen zum Eisprung hin (15→20→15px) und werden röter (blass → kräftig rot mit weißer Mitte → blass), danach wieder abnehmend. Kalender zeigt jetzt 6 Monate rückwirkend (−6 bis +11, 18 Monate); Wochentags-Kopf sticky; Auto-Scroll auf den aktuellen Monat beim Öffnen (an `document.fonts.ready` gekoppelt, damit der Webfont-Reflow den Scroll nicht verfälscht). `isPeak`/`isFertile` dadurch ungenutzt, aber als dokumentierte Utilities belassen.
 
+## Offener PR (Session 2026-07-23)
+
+**PR #5 — Zweisprachigkeit DE/EN** (`claude/tree-en-version-planning-5a4cd5 → main`, noch offen): In-App-Sprachumschalter, **ein Build für beide Sprachen** (kein separater englischer Fork). Alle UI-Strings in einem `STR`-Dictionary (`{de,en}`), dazu sprach-gekeyte `PLBL`/`PTXT`/`MO`/`WD`; `dTxt`/`niceFmt` nehmen die Sprache (Datum `en-US` vs `de-DE`, Woche in beiden Mo-first). Sprache wird beim ersten Start aus dem Browser erkannt (`detectLang()`), in Einstellungen → Darstellung (DE/EN) umschaltbar, als `lg` in `sc-v1` persistiert; `document.documentElement.lang` mitgeführt. Geteilte `#p=`-Links tragen keine Sprache — jede*r sieht sie in der eigenen. `index.html` + PWA-Manifest auf Englisch. **Regel in CLAUDE.md verankert:** neuer UI-Text immer als DE- **und** EN-Key, nie inline, nie einen sprachspezifischen Build forken. Branch wurde auf aktuelles `main` rebased, erbt also alle Features (Blüte, Rück-Kalender, granulares Teilen, PMS-Logging).
+
 ## Lokale Vorschau
 
 `.claude/launch.json` definiert den Dev-Server (`sharecycle-dev`, `npm run dev`, Port 5173, cwd `sharecycle-pwa`) — für die Browser-Vorschau in Claude Code bzw. lokal via `npm run dev` im `sharecycle-pwa/`-Ordner.
@@ -38,4 +42,4 @@ ShareCycle ist eine privacy-first Zyklus-Tracking-PWA (React/Vite, deutschsprach
 ## Nächste Schritte / offene Punkte
 
 - **Apple Developer Account** existiert noch nicht — Voraussetzung für den App-Store-Pfad (Checkliste in APPSTORE.md: Bundle-ID, Capacitor-Wrapper, Screenshots stehen aus).
-- Keine offenen Merge-/Push-Entscheidungen mehr — `main` ist der einzige aktive Stand.
+- **PR #5 (Zweisprachigkeit)** wartet auf Review/Merge in `main`. Danach Branch aufräumen.
