@@ -249,7 +249,7 @@ export default function ShareCycle(){
       const pmsLen=pmsOffset!=null?ad.cl-pmsOffset:5;
       const solidPMS=p==="pms"&&lpsParsed&&dif(date,lpsParsed)>=0&&dif(date,lpsParsed)<pmsLen;
       const isT=dif(date,today)===0,isSel=sel&&dif(date,sel)===0;
-      const vis=(p==="period"&&spd)||(p==="follicular"&&sfl)||(p==="ovulation"&&sov)||(p==="luteal"&&slt)||(p==="pms"&&spm);
+      const vis=pv?true:((p==="period"&&spd)||(p==="follicular"&&sfl)||(p==="ovulation"&&sov)||(p==="luteal"&&slt)||(p==="pms"&&spm));
       const partOk=!pv||ad.sp[p]!==false;
       const show=vis&&partOk;
       // Ovulation bloom: petals grow 15→20→15px and redden toward the peak day, palest at the window edges.
@@ -349,8 +349,9 @@ export default function ShareCycle(){
       {/* Phase toggles — always visible, compact pill row */}
       {as&&(
         <div style={{display:"flex",gap:6,padding:"8px 14px 6px",flexShrink:0,overflowX:"auto",borderBottom:`1px solid ${T.line}`,background:T.bg+"F0",backdropFilter:"blur(8px)"}}>
-          {[["P",spd,setSpd,T.coral,S.pPeriod],["F",sfl,setSfl,T.follicular,S.pFollicular],["◆",sov,setSov,T.gold,S.pOvulation],["L",slt,setSlt,T.luteal,S.pLuteal],["~",spm,setSpm,T.mauve,S.pPms]].map(([icon,on,set,col,tip])=>{
-            return <div key={tip} onClick={()=>set(v=>!v)} title={tip} style={{display:"flex",alignItems:"center",gap:4,padding:"5px 9px",borderRadius:999,background:on?col+"30":T.card2,border:`1px solid ${on?col:T.line2}`,cursor:"pointer",flexShrink:0,userSelect:"none"}}>
+          {[["period","P",spd,setSpd,T.coral,S.pPeriod],["follicular","F",sfl,setSfl,T.follicular,S.pFollicular],["ovulation","◆",sov,setSov,T.gold,S.pOvulation],["luteal","L",slt,setSlt,T.luteal,S.pLuteal],["pms","~",spm,setSpm,T.mauve,S.pPms]].map(([key,icon,stateOn,set,col,tip])=>{
+            const on=pv?ad.sp[key]!==false:stateOn;
+            return <div key={tip} onClick={pv?undefined:()=>set(v=>!v)} title={tip} style={{display:"flex",alignItems:"center",gap:4,padding:"5px 9px",borderRadius:999,background:on?col+"30":T.card2,border:`1px solid ${on?col:T.line2}`,cursor:pv?"default":"pointer",flexShrink:0,userSelect:"none",opacity:pv?.5:1}}>
               <div style={{width:7,height:7,borderRadius:"50%",background:on?col:T.muted}}/>
               <span style={{fontSize:11,fontWeight:700,color:on?col:T.muted,fontFamily:F,whiteSpace:"nowrap"}}>{tip}</span>
             </div>;
