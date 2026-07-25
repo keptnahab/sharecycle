@@ -13,16 +13,16 @@ export default defineConfig({
         'sharecycle-symbol.png'
       ],
       manifest: {
-        name: 'ShareCycle – Zyklustracker',
+        name: 'ShareCycle – Cycle tracker',
         short_name: 'ShareCycle',
-        description: 'Dein privater Zykluskalender. Keine Cloud, keine Accounts.',
+        description: 'Your private cycle calendar. No cloud, no accounts.',
         theme_color: '#1A111A',
         background_color: '#1A111A',
         display: 'standalone',
         orientation: 'portrait',
         scope: '/',
         start_url: '/',
-        lang: 'de',
+        lang: 'en',
         categories: ['health', 'lifestyle'],
         icons: [
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
