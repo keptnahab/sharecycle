@@ -166,7 +166,7 @@ export default function ShareCycle(){
 
   const calM=useMemo(()=>{
     const r=[];
-    for(let o=-6;o<12;o++){
+    for(let o=-12;o<12;o++){
       const m=new Date(today.getFullYear(),today.getMonth()+o,1);
       const fw=(m.getDay()+6)%7,dim=new Date(m.getFullYear(),m.getMonth()+1,0).getDate();
       const cells=[];
