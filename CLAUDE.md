@@ -20,21 +20,23 @@ ShareCycle is a privacy-first menstrual cycle tracking PWA. All user data stays 
 
 **Data model** (localStorage key `sc-v1`):
 ```js
-{ nm, lp, ps, cl, pl, dk, lps, lg }
+{ nm, lp, ps, cl, pl, dk, lps, pss, lg }
 // name, last-period date (ISO), ps = period-start history (array of ISO dates, ascending),
 // cycle length (days), period length (days), dark-mode bool,
-// lps = logged PMS start date (ISO, optional). When set, phOf() shifts the luteal→PMS
-// boundary to this actual start instead of the default cl-5 estimate. Absent on older data.
+// lps = newest logged PMS start (ISO, optional), pss = PMS-start history (array of ISO
+// dates, ascending, optional). A PMS start shifts the luteal→PMS boundary of *its own*
+// cycle to the actual start instead of the default len-5 estimate. Absent on older data.
 // lg = UI language "de" | "en" (optional). Absent on older data → treated as "de".
 ```
-`ps` is the source of truth for everything the calendar shows; `lp` is kept as its last
-element for backwards compatibility (older data / older share links carry only `lp`, which
-is migrated to `ps: [lp]` on load).
+`ps`/`pss` are the source of truth for everything the calendar shows; `lp`/`lps` are kept
+as their last elements for backwards compatibility (older data / older share links carry
+only `lp` and `lps`, migrated to `ps: [lp]` / `pss: [lps]` on load).
 
 **Core pure utilities** (all in ShareCycle.jsx):
 | Function | Purpose |
 |----------|---------|
 | `segOf(date, starts, cl)` | The cycle segment a date falls into: `{s, len, logged}` — see below |
+| `pmsFor(seg, pmsStarts, lastOff)` | The luteal→PMS boundary of a segment: `{off, logged}` |
 | `phOf(date, seg)` | Returns cycle phase for a date: `period`, `follicular`, `ovulation`, `luteal`, `pms` |
 | `cycDay(date, seg)` | Cycle day number (1-based) |
 | `isPeak(date, seg)` | True on peak ovulation day |
@@ -53,6 +55,13 @@ where it did came from computing every date as `dif(date, lp) % cl`. Logged peri
 render solid in the calendar, predicted/extrapolated ones hatched. Two starts closer than
 `MINGAP` (10 days) are treated as a correction of the same entry, not as two cycles; a
 logged start can be removed again via long-press (only while more than one exists).
+
+The same holds for PMS starts (`pss`): `pmsFor()` resolves the luteal→PMS boundary **per
+cycle** — a PMS start logged inside a cycle wins there, cycles *after* the newest logged one
+inherit its offset as a refined estimate (so predictions still benefit), and earlier cycles
+without a log keep the default `len-5`. Logging a PMS start therefore never repaints past
+months either. Logged PMS days render solid, estimated ones hatched; a logged PMS start can
+be removed again via long-press.
 
 **URL sharing:** Share links use hash fragments (`#p=<base64>`). The app detects these on load and enters a read-only preview mode. The share payload is `{nm,lp,ps,cl,pl,sp,sxt}` (`ps` so the partner sees the same past
 months; links without it fall back to `[lp]`):

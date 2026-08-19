@@ -65,6 +65,19 @@ const phOf=(date,seg,pl,pmsOffset)=>{
   if(d<ps)return"luteal";
   return"pms";
 };
+// The luteal→PMS boundary for a segment: a PMS start logged inside that cycle wins; cycles
+// after the newest logged one inherit its offset as a refined estimate; older cycles without
+// a log keep the default (len-5). Logging a PMS start therefore never repaints past months.
+const pmsFor=(seg,pmsStarts,lastOff)=>{
+  if(!seg)return null;
+  for(let k=(pmsStarts||[]).length-1;k>=0;k--){
+    const o=dif(pmsStarts[k],seg.s);
+    if(o>=0&&o<seg.len)return{off:o,logged:true};
+  }
+  const last=pmsStarts&&pmsStarts.length?pmsStarts[pmsStarts.length-1]:null;
+  if(last&&lastOff!=null&&lastOff<seg.len&&dif(seg.s,last)>0)return{off:lastOff,logged:false};
+  return null;
+};
 const isPeak=(date,seg)=>!!seg&&dif(date,seg.s)===seg.len-14;
 const isFertile=(date,seg)=>{if(!seg)return false;const d=dif(date,seg.s),ov=seg.len-14;return(d>=ov-5&&d<ov)||(d>ov&&d<=ov+2);};
 const cycDay=(date,seg)=>seg?dif(date,seg.s)+1:null;
@@ -116,6 +129,7 @@ const STR={
     setPeriodStart:"Periodenbeginn setzen",setPeriodStartSub:"Starttag der Periode eintragen",
     setPmsStart:"PMS-Beginn setzen",setPmsStartSub:"Tatsächlichen PMS-Start eintragen",
     delPeriodStart:"Periodenbeginn entfernen",delPeriodStartSub:"Diesen eingetragenen Start wieder löschen",
+    delPmsStart:"PMS-Beginn entfernen",delPmsStartSub:"Diesen eingetragenen PMS-Start wieder löschen",
     periodEvent:"Periode",ovulationEvent:"Eisprung"},
   en:{share:"Share",pPeriod:"Period",pFollicular:"Follicular",pOvulation:"Ovulation",pLuteal:"Luteal",pPms:"PMS",
     day:"Day",of:"of",today:"Today",nextPeriod:"Next period",cycleDay:"Cycle day",
@@ -132,6 +146,7 @@ const STR={
     setPeriodStart:"Set period start",setPeriodStartSub:"Log the first day of the period",
     setPmsStart:"Set PMS start",setPmsStartSub:"Log the actual PMS start",
     delPeriodStart:"Remove period start",delPeriodStartSub:"Delete this logged start again",
+    delPmsStart:"Remove PMS start",delPmsStartSub:"Delete this logged PMS start again",
     periodEvent:"Period",ovulationEvent:"Ovulation"}
 };
 
@@ -163,7 +178,7 @@ export default function ShareCycle(){
   const lpTimer=React.useRef(null);
   const calScrolled=React.useRef(false);
   const curMonthRef=React.useRef(null);
-  const[lps,setLps]=useState("");
+  const[pss,setPss]=useState([]);
   const[pv,setPv]=useState(null);
 
   useEffect(()=>{
@@ -171,26 +186,30 @@ export default function ShareCycle(){
     if(h.startsWith("p=")){const d=decShare(h.slice(2));if(d?.lp){setPv(d);return;}}
     const s=loadLS();
     // `ps` (period-start history) was added later — older entries only carry `lp`.
-    if(s?.lp){setNm(s.nm||"");setPs(s.ps&&s.ps.length?s.ps.slice().sort():[s.lp]);setCl(s.cl||28);setPl(s.pl||5);if(s.dk!==undefined)setDk(s.dk);if(s.lps)setLps(s.lps);setLg(s.lg!==undefined?s.lg:"de");}
+    if(s?.lp){setNm(s.nm||"");setPs(s.ps&&s.ps.length?s.ps.slice().sort():[s.lp]);setCl(s.cl||28);setPl(s.pl||5);if(s.dk!==undefined)setDk(s.dk);setPss(s.pss&&s.pss.length?s.pss.slice().sort():(s.lps?[s.lps]:[]));setLg(s.lg!==undefined?s.lg:"de");}
     else setSSetup(true);
   },[]);
 
   const lp=ps.length?ps[ps.length-1]:"";
-  useEffect(()=>{if(lp)saveLS({nm,lp,ps,cl,pl,dk,lps,lg});},[nm,lp,ps,cl,pl,dk,lps,lg]);
+  const lps=pss.length?pss[pss.length-1]:"";
+  useEffect(()=>{if(lp)saveLS({nm,lp,ps,cl,pl,dk,lps,pss,lg});},[nm,lp,ps,cl,pl,dk,lps,pss,lg]);
   useEffect(()=>{try{document.documentElement.lang=lg;}catch{}},[lg]);
 
   const T=dk?DK:LK;
   const L=lg,S=STR[L];
   const today=useMemo(()=>toD(new Date()),[]);
-  const ad=pv?{nm:pv.nm||"",lp:pv.lp,ps:pv.ps&&pv.ps.length?pv.ps:[pv.lp],cl:pv.cl||28,pl:pv.pl||5,lps:"",sp:pv.sp||{period:true,follicular:true,ovulation:true,luteal:true,pms:true},sxt:pv.sxt!==false}:{nm,lp,ps,cl,pl,lps,sp:{period:true,follicular:true,ovulation:true,luteal:true,pms:true},sxt:true};
+  const ad=pv?{nm:pv.nm||"",lp:pv.lp,ps:pv.ps&&pv.ps.length?pv.ps:[pv.lp],cl:pv.cl||28,pl:pv.pl||5,pss:[],sp:pv.sp||{period:true,follicular:true,ovulation:true,luteal:true,pms:true},sxt:pv.sxt!==false}:{nm,lp,ps,cl,pl,pss,sp:{period:true,follicular:true,ovulation:true,luteal:true,pms:true},sxt:true};
   const as=ad.lp?parse(ad.lp):null;
   const starts=ad.ps.filter(Boolean).map(parse);
-  const lpsSeg=ad.lps?segOf(parse(ad.lps),starts,ad.cl):null;
-  const pmsOffset=lpsSeg?dif(parse(ad.lps),lpsSeg.s):null;
+  const pmsStarts=ad.pss.filter(Boolean).map(parse);
+  const lastPms=pmsStarts.length?pmsStarts[pmsStarts.length-1]:null;
+  const lastPmsSeg=lastPms?segOf(lastPms,starts,ad.cl):null;
+  const lastPmsOff=lastPmsSeg?dif(lastPms,lastPmsSeg.s):null;
   const fd=sel||today,itd=dif(fd,today)===0;
   const fdSeg=segOf(fd,starts,ad.cl);
   const fdLen=fdSeg?fdSeg.len:ad.cl;
-  const ph=phOf(fd,fdSeg,ad.pl,pmsOffset);
+  const fdPms=pmsFor(fdSeg,pmsStarts,lastPmsOff);
+  const ph=phOf(fd,fdSeg,ad.pl,fdPms?fdPms.off:null);
   const fdc=cycDay(fd,fdSeg);
   const np=nextPer(fd,starts,ad.cl),du=np?dif(np,fd):null;
   const no=nextOvu(fd,starts,ad.cl),dto=no?dif(no,fd):null;
@@ -282,13 +301,13 @@ export default function ShareCycle(){
     for(let ci=0;ci<cells.length;ci++){
       const{date,in:inM}=cells[ci];
       const seg=segOf(date,starts,ad.cl);
-      const p=phOf(date,seg,ad.pl,pmsOffset);
+      const pmsInfo=pmsFor(seg,pmsStarts,lastPmsOff);
+      const p=phOf(date,seg,ad.pl,pmsInfo?pmsInfo.off:null);
       const cdNum=seg&&inM?cycDay(date,seg):null;
       // Solid (vs. hatched) = this period start was actually logged, not predicted.
       const solidPeriod=p==="period"&&!!seg&&seg.logged;
-      const lpsParsed=ad.lps?parse(ad.lps):null;
-      const pmsLen=pmsOffset!=null&&lpsSeg?Math.max(lpsSeg.len-pmsOffset,1):5;
-      const solidPMS=p==="pms"&&lpsParsed&&dif(date,lpsParsed)>=0&&dif(date,lpsParsed)<pmsLen;
+      // Solid (vs. hatched) = the PMS start of this cycle was actually logged, not estimated.
+      const solidPMS=p==="pms"&&!!pmsInfo&&pmsInfo.logged;
       const isT=dif(date,today)===0,isSel=sel&&dif(date,sel)===0;
       const vis=pv?true:((p==="period"&&spd)||(p==="follicular"&&sfl)||(p==="ovulation"&&sov)||(p==="luteal"&&slt)||(p==="pms"&&spm));
       const partOk=!pv||ad.sp[p]!==false;
@@ -541,7 +560,7 @@ export default function ShareCycle(){
               </div>
             </div>
             {lp&&<button onClick={()=>setSSetup(false)} style={{display:"block",width:"100%",background:T.coral,color:"#fff",fontSize:16,fontWeight:700,padding:15,borderRadius:16,border:"none",cursor:"pointer",marginTop:16,fontFamily:F}}>{S.save}</button>}
-            {lp&&<button onClick={()=>{if(confirm(S.confirmDelete)){localStorage.removeItem(SK);setNm("");setPs([]);setLps("");setCl(28);setPl(5);setSSetup(true);}}} style={{display:"block",width:"100%",background:T.mauve+"22",color:"#FF453A",fontSize:15,fontWeight:500,padding:14,borderRadius:14,marginTop:10,cursor:"pointer",border:"none",fontFamily:F}}>{S.deleteAll}</button>}
+            {lp&&<button onClick={()=>{if(confirm(S.confirmDelete)){localStorage.removeItem(SK);setNm("");setPs([]);setPss([]);setCl(28);setPl(5);setSSetup(true);}}} style={{display:"block",width:"100%",background:T.mauve+"22",color:"#FF453A",fontSize:15,fontWeight:500,padding:14,borderRadius:14,marginTop:10,cursor:"pointer",border:"none",fontFamily:F}}>{S.deleteAll}</button>}
             <p style={{fontSize:12,color:T.muted,textAlign:"center",marginTop:18,lineHeight:1.5,fontFamily:F}}>{S.localNote}</p>
           </div>
         </div>
@@ -647,13 +666,22 @@ export default function ShareCycle(){
                 <div style={{fontSize:12,color:T.muted,fontFamily:F,marginTop:2}}>{S.setPeriodStartSub}</div>
               </div>
             </button>
-            <button onClick={()=>{setLps(lpChoice);setSel(null);setLpChoice(null);}} style={{display:"flex",alignItems:"center",gap:12,width:"100%",background:T.mauve+"22",border:`1.5px solid ${T.mauve}55`,borderRadius:16,padding:"14px 18px",marginBottom:10,cursor:"pointer",fontFamily:F}}>
+            <button onClick={()=>{setPss(o=>putStart(o,lpChoice));setSel(null);setLpChoice(null);}} style={{display:"flex",alignItems:"center",gap:12,width:"100%",background:T.mauve+"22",border:`1.5px solid ${T.mauve}55`,borderRadius:16,padding:"14px 18px",marginBottom:10,cursor:"pointer",fontFamily:F}}>
               <span style={{fontSize:22}}>🌙</span>
               <div style={{textAlign:"left"}}>
                 <div style={{fontSize:15,fontWeight:700,color:T.mauve,fontFamily:F}}>{S.setPmsStart}</div>
                 <div style={{fontSize:12,color:T.muted,fontFamily:F,marginTop:2}}>{S.setPmsStartSub}</div>
               </div>
             </button>
+            {pss.indexOf(lpChoice)>=0&&(
+              <button onClick={()=>{setPss(o=>delStart(o,lpChoice));setSel(null);setLpChoice(null);}} style={{display:"flex",alignItems:"center",gap:12,width:"100%",background:T.card2,border:`1.5px solid ${T.line2}`,borderRadius:16,padding:"14px 18px",marginBottom:10,cursor:"pointer",fontFamily:F}}>
+                <span style={{fontSize:22}}>🗑</span>
+                <div style={{textAlign:"left"}}>
+                  <div style={{fontSize:15,fontWeight:700,color:T.ink2,fontFamily:F}}>{S.delPmsStart}</div>
+                  <div style={{fontSize:12,color:T.muted,fontFamily:F,marginTop:2}}>{S.delPmsStartSub}</div>
+                </div>
+              </button>
+            )}
             {ps.length>1&&ps.indexOf(lpChoice)>=0&&(
               <button onClick={()=>{setPs(o=>delStart(o,lpChoice));setSel(null);setLpChoice(null);}} style={{display:"flex",alignItems:"center",gap:12,width:"100%",background:T.card2,border:`1.5px solid ${T.line2}`,borderRadius:16,padding:"14px 18px",marginBottom:10,cursor:"pointer",fontFamily:F}}>
                 <span style={{fontSize:22}}>🗑</span>

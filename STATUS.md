@@ -45,8 +45,10 @@ Weitere Punkte:
 - Eingetragene Periodenstarts werden solid dargestellt, prognostizierte/extrapolierte gestrichelt.
 - `putStart()` behandelt einen neuen Beginn im Abstand < 10 Tagen (`MINGAP`) als Korrektur des bestehenden Eintrags statt als neuen Zyklus; der Datepicker in den Einstellungen ersetzt gezielt den aktuellsten Eintrag.
 - Neue Long-Press-Option „Periodenbeginn entfernen" (DE/EN), sichtbar nur auf einem eingetragenen Starttag und nur solange mehr als einer existiert.
+- **Gleiches Problem beim PMS-Beginn mitbehoben:** `lps` war ein einzelnes Datum, dessen Zyklustag-Offset auf *jeden* Zyklus angewendet wurde — ein neu eingetragener PMS-Start verschob also die Luteal→PMS-Grenze auch in allen Vormonaten. Jetzt Historie `pss` (ISO-Array; `lps` bleibt als letztes Element für Abwärtskompatibilität, Altdaten → `pss: [lps]`). Neue Funktion `pmsFor(seg, pmsStarts, lastOff)` löst die Grenze **pro Zyklus** auf: ein im Zyklus eingetragener PMS-Start gewinnt dort; Zyklen *nach* dem neuesten Eintrag erben dessen Offset als verfeinerte Schätzung (Prognose profitiert weiterhin); frühere Zyklen ohne Eintrag behalten die Standardschätzung `len-5`. Eingetragene PMS-Tage solid, geschätzte gestrichelt; Long-Press-Option „PMS-Beginn entfernen" (DE/EN) ergänzt.
 - Share-Link-Payload trägt `ps` mit, damit die Partneransicht dieselben Vormonate zeigt; alte Links ohne `ps` funktionieren unverändert (`[lp]`).
-- Verifiziert mit Browser-Smoke-Test: nach Eintragen eines neuen Beginns ändert sich in den Vormonaten keine einzige Kalenderzelle mehr (vorher: kompletter Rutsch), Altdaten und alte Share-Links rendern fehlerfrei.
+- Verifiziert mit Browser-Smoke-Test: nach Eintragen eines neuen Perioden- bzw. PMS-Beginns ändert sich in den Vormonaten keine einzige Kalenderzelle mehr (vorher: kompletter Rutsch), Altdaten und alte Share-Links rendern fehlerfrei.
+- **Auslieferung:** Der Fix ist erst im Branch. Auf dem Homescreen des Nutzers läuft weiterhin der `main`-Stand — Netlify deployt nur von `main`, also braucht es Merge → Deploy. Die PWA aktualisiert sich danach von selbst (`registerType: 'autoUpdate'`, `sw.js` mit `Cache-Control: no-cache`): App einmal komplett schließen und neu öffnen, ggf. zweimal. Kein Neu-Installieren nötig, `localStorage` bleibt erhalten.
 
 ## Lokale Vorschau
 
