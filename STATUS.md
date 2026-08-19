@@ -50,6 +50,18 @@ Weitere Punkte:
 - Verifiziert mit Browser-Smoke-Test: nach Eintragen eines neuen Perioden- bzw. PMS-Beginns ändert sich in den Vormonaten keine einzige Kalenderzelle mehr (vorher: kompletter Rutsch), Altdaten und alte Share-Links rendern fehlerfrei.
 - **Auslieferung:** Der Fix ist erst im Branch. Auf dem Homescreen des Nutzers läuft weiterhin der `main`-Stand — Netlify deployt nur von `main`, also braucht es Merge → Deploy. Die PWA aktualisiert sich danach von selbst (`registerType: 'autoUpdate'`, `sw.js` mit `Cache-Control: no-cache`): App einmal komplett schließen und neu öffnen, ggf. zweimal. Kein Neu-Installieren nötig, `localStorage` bleibt erhalten.
 
+## Partner-Ansicht abgedichtet (2026-08-19, gleicher Branch)
+
+Gemeldet: Share-Link in Safari geöffnet und via „Zum Home-Bildschirm → als Web-App" gesichert → beim Start landete der Partner in den Einstellungen und sollte einen Periodenbeginn eintragen.
+
+Ursache: iOS nutzt beim Installieren die `start_url` des Manifests (`/`) statt der Seiten-URL und wirft damit das `#p=`-Fragment weg — ohne Hash und ohne eigene Daten hielt sich die App für eine Erstinstallation.
+
+Behoben:
+- Neuer localStorage-Key **`sc-pv1`** `{p, dk, lg}`: zuletzt geöffnetes Share-Payload plus die Darstellungs-Einstellungen *dieses* Betrachters. Beim Start ohne Hash wird daraus die Partner-Ansicht wiederhergestellt — eigene Daten in `sc-v1` haben immer Vorrang, die Partner-Ansicht schreibt nie nach `sc-v1`.
+- In der Partner-Ansicht wird der `<link rel="manifest">` entfernt und `#p=…` per `history.replaceState` wieder in die URL gesetzt, damit „Zum Home-Bildschirm" die vollständige Share-URL mitnimmt.
+- Partner-Ansicht ist jetzt strikt read-only: Name nur als Label (nicht mehr editierbar), kein Teilen-Button, Long-Press ohne Wirkung, und die Einstellungen zeigen **nur** die Gruppe „Darstellung" (Dunkles Design + Sprache). Das Setup-Sheet geht dort nie automatisch auf; der „↩"-Button erscheint nur, wenn das Gerät eigene Daten hat.
+- Verifiziert im Browser: Partner mit frischem Storage — Link direkt geöffnet und Start ohne Hash zeigen beide den Kalender statt des Setups, `sc-v1` bleibt leer, Settings enthalten nur „Darstellung". Besitzerinnen-Flow unverändert (Erststart öffnet Setup, volle Einstellungen, Teilen-Button, Manifest bleibt).
+
 ## Lokale Vorschau
 
 `.claude/launch.json` definiert den Dev-Server (`sharecycle-dev`, `npm run dev`, Port 5173, cwd `sharecycle-pwa`) — für die Browser-Vorschau in Claude Code bzw. lokal via `npm run dev` im `sharecycle-pwa/`-Ordner.

@@ -72,6 +72,22 @@ Older links without `sp` are treated defensively as "everything visible". The `P
 
 Default `sp` when opening the share sheet for the first time: `{period:true,follicular:false,ovulation:true,luteal:false,pms:true}` — period/ovulation/PMS are the phases most relevant to a partner, follicular/luteal are off by default. `sxt` (explanation texts) defaults to `true`.
 
+**Partner view (`pv`) is strictly read-only (fixed 2026-08-19):** the share-link viewer sees
+the name (plain label, not editable), the phase pills (disabled), the hero card and the
+calendar. No share button, no logging (long-press is a no-op), and Settings show *only* the
+"Appearance" group — name/period/cycle/save/delete belong to the owner and are hidden behind
+`{!pv&&(…)}`. The setup sheet never auto-opens in the partner view. The "↩ back to my own
+app" button only appears when this device actually has own data in `sc-v1`.
+
+The partner view survives being installed to the home screen. iOS follows the manifest's
+`start_url` ("/") instead of the page URL and therefore drops the `#p=` fragment, which used
+to land the partner in the setup sheet. Two things prevent that: the last opened payload plus
+that viewer's appearance prefs are stored under **`sc-pv1`** `{p,dk,lg}` and restored when
+there is no hash *and* no own data (own `sc-v1` data always wins), and while in the partner
+view the app removes the `<link rel="manifest">` and puts `#p=…` back into the URL via
+`history.replaceState`, so an "Add to Home Screen" captures the full share URL. Never let the
+partner view write to `sc-v1`.
+
 **Explicitly out of scope (decided 2026-07-09, don't re-add without asking):** a separate toggle for whether the name or future predictions are shared was considered and explicitly rejected by Michael when the granular-sharing feature was speced — only phase-selection + explanation-text toggle were requested.
 
 **Internationalization (one codebase, both languages):** There is **no separate English build or branch** — DE and EN ship from this single file, so features are shared across languages by construction. The language mirrors the existing theme pattern (`T = dk ? DK : LK`): `const L = lg; const S = STR[L];`.

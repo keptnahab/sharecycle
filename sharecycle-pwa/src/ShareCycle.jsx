@@ -19,6 +19,7 @@ const MO={de:["Januar","Februar","März","April","Mai","Juni","Juli","August","S
   en:["January","February","March","April","May","June","July","August","September","October","November","December"]};
 const WD={de:["Mo","Di","Mi","Do","Fr","Sa","So"],en:["Mo","Tu","We","Th","Fr","Sa","Su"]};
 const SK="sc-v1";
+const PK="sc-pv1";
 const F="'Plus Jakarta Sans',-apple-system,sans-serif";
 
 const toD=d=>{const x=new Date(d);x.setHours(0,0,0,0);return x;};
@@ -91,6 +92,11 @@ const encShare=(d,sp,sxt)=>btoa(unescape(encodeURIComponent(JSON.stringify({...d
 const decShare=h=>{try{return JSON.parse(decodeURIComponent(escape(atob(h))));}catch{return null;}};
 const loadLS=()=>{try{const r=localStorage.getItem(SK);return r?JSON.parse(r):null;}catch{return null;}};
 const saveLS=s=>{try{localStorage.setItem(SK,JSON.stringify(s));}catch{}};
+// Partner view: the last opened share payload plus that viewer's own appearance prefs.
+// Kept separately from `sc-v1` so a partner never owns cycle data — and so a share link
+// added to the home screen still works when the launcher drops the `#p=` fragment.
+const loadPV=()=>{try{const r=localStorage.getItem(PK);return r?JSON.parse(r):null;}catch{return null;}};
+const savePV=s=>{try{localStorage.setItem(PK,JSON.stringify(s));}catch{}};
 const pxy=(cx,cy,r,a)=>{const rad=(a-90)*Math.PI/180;return{x:cx+r*Math.cos(rad),y:cy+r*Math.sin(rad)};};
 
 const PLBL={de:{period:"Periode",follicular:"Follikelphase",ovulation:"Eisprung",luteal:"Lutealphase",pms:"PMS",none:"—"},
@@ -180,11 +186,27 @@ export default function ShareCycle(){
   const curMonthRef=React.useRef(null);
   const[pss,setPss]=useState([]);
   const[pv,setPv]=useState(null);
+  const[pvRaw,setPvRaw]=useState("");
+  const[own,setOwn]=useState(false);
 
   useEffect(()=>{
     const h=window.location.hash.replace(/^#/,"");
-    if(h.startsWith("p=")){const d=decShare(h.slice(2));if(d?.lp){setPv(d);return;}}
     const s=loadLS();
+    setOwn(!!s?.lp);
+    // Own data always wins without a hash; a stored share payload only steps in for a
+    // device that has none (partner who installed the link to the home screen).
+    const pvs=loadPV();
+    const raw=h.startsWith("p=")?h.slice(2):(!s?.lp&&pvs?.p?pvs.p:"");
+    if(raw){
+      const d=decShare(raw);
+      if(d?.lp){
+        setPv(d);setPvRaw(raw);
+        const pref=pvs||s;
+        if(pref?.dk!==undefined)setDk(pref.dk);
+        if(pref?.lg!==undefined)setLg(pref.lg);
+        return;
+      }
+    }
     // `ps` (period-start history) was added later — older entries only carry `lp`.
     if(s?.lp){setNm(s.nm||"");setPs(s.ps&&s.ps.length?s.ps.slice().sort():[s.lp]);setCl(s.cl||28);setPl(s.pl||5);if(s.dk!==undefined)setDk(s.dk);setPss(s.pss&&s.pss.length?s.pss.slice().sort():(s.lps?[s.lps]:[]));setLg(s.lg!==undefined?s.lg:"de");}
     else setSSetup(true);
@@ -194,6 +216,16 @@ export default function ShareCycle(){
   const lps=pss.length?pss[pss.length-1]:"";
   useEffect(()=>{if(lp)saveLS({nm,lp,ps,cl,pl,dk,lps,pss,lg});},[nm,lp,ps,cl,pl,dk,lps,pss,lg]);
   useEffect(()=>{try{document.documentElement.lang=lg;}catch{}},[lg]);
+  useEffect(()=>{if(pvRaw)savePV({p:pvRaw,dk,lg});},[pvRaw,dk,lg]);
+  // "Add to Home Screen" would follow the manifest's start_url ("/") and drop the `#p=`
+  // payload, so the partner view drops the manifest and puts its own URL back in place.
+  useEffect(()=>{
+    if(!pvRaw)return;
+    try{
+      document.querySelectorAll('link[rel="manifest"]').forEach(el=>el.remove());
+      if(!window.location.hash)history.replaceState(null,"","#p="+pvRaw);
+    }catch{}
+  },[pvRaw]);
 
   const T=dk?DK:LK;
   const L=lg,S=STR[L];
@@ -288,6 +320,7 @@ export default function ShareCycle(){
   const ROW={display:"flex",justifyContent:"space-between",alignItems:"center",padding:"13px 16px",minHeight:48,borderBottom:`1px solid ${T.line}`};
 
   const startLP=(isoStr)=>{
+    if(pv)return;
     cancelLP();
     lpTimer.current=setTimeout(()=>setLpChoice(isoStr),700);
   };
@@ -337,7 +370,7 @@ export default function ShareCycle(){
       if(isT)border=`2.5px solid ${T.ink}`;
       if(isSel)border=`2.5px solid ${T.coral}`;
       dayCells.push(
-        <button key={ci} data-date={iso(date)} onClick={()=>setSel(isSel?null:date)} onTouchStart={e=>{const d=e.currentTarget.getAttribute("data-date");if(d)startLP(d);}} onTouchEnd={cancelLP} onTouchMove={cancelLP} onMouseDown={e=>{if(e.button!==0)return;const d=e.currentTarget.getAttribute("data-date");if(d)startLP(d);}} onMouseUp={cancelLP} onMouseLeave={cancelLP} onContextMenu={e=>{e.preventDefault();const d=e.currentTarget.getAttribute("data-date");if(d)setLpChoice(d);}} style={{aspectRatio:"1/1",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",borderRadius:11,background:bg,border,opacity:inM?1:.3,position:"relative",fontFamily:F,cursor:"pointer",boxShadow:isSel?`0 0 0 3px ${T.coral}44`:"none",userSelect:"none",WebkitUserSelect:"none"}}>
+        <button key={ci} data-date={iso(date)} onClick={()=>setSel(isSel?null:date)} onTouchStart={e=>{const d=e.currentTarget.getAttribute("data-date");if(d)startLP(d);}} onTouchEnd={cancelLP} onTouchMove={cancelLP} onMouseDown={e=>{if(e.button!==0)return;const d=e.currentTarget.getAttribute("data-date");if(d)startLP(d);}} onMouseUp={cancelLP} onMouseLeave={cancelLP} onContextMenu={e=>{e.preventDefault();if(pv)return;const d=e.currentTarget.getAttribute("data-date");if(d)setLpChoice(d);}} style={{aspectRatio:"1/1",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",borderRadius:11,background:bg,border,opacity:inM?1:.3,position:"relative",fontFamily:F,cursor:"pointer",boxShadow:isSel?`0 0 0 3px ${T.coral}44`:"none",userSelect:"none",WebkitUserSelect:"none"}}>
           {cdNum&&<span style={{position:"absolute",top:2,right:3,fontSize:12,fontWeight:600,color:dayCol,opacity:.65,lineHeight:1,fontFamily:F}}>{cdNum}</span>}
           <span style={{fontSize:15,fontWeight:fw,color:dayCol,lineHeight:1}}>{date.getDate()}</span>
           {ovSize>0&&(
@@ -391,18 +424,19 @@ export default function ShareCycle(){
         <img src="/sharecycle-symbol.png" alt="ShareCycle" width="34" height="34" style={{display:"block",objectFit:"contain"}}/>
         <div style={{textAlign:"center"}}>
           {ad.nm
-            ?<button onClick={()=>{setNi(ad.nm);setSNm(true);}} style={{fontSize:16,fontWeight:700,color:T.coral,padding:"4px 12px",borderRadius:999,border:`1px solid ${T.coral}44`,fontFamily:F}}>{ad.nm}</button>
+            ?(pv
+              ?<span style={{display:"inline-block",fontSize:16,fontWeight:700,color:T.coral,padding:"4px 12px",borderRadius:999,border:`1px solid ${T.coral}44`,fontFamily:F}}>{ad.nm}</span>
+              :<button onClick={()=>{setNi(ad.nm);setSNm(true);}} style={{fontSize:16,fontWeight:700,color:T.coral,padding:"4px 12px",borderRadius:999,border:`1px solid ${T.coral}44`,fontFamily:F}}>{ad.nm}</button>)
             :<span style={{fontSize:16,fontWeight:700,fontFamily:F}}><span style={{color:T.ink}}>Share</span><span style={{color:T.coral}}>Cycle</span></span>}
         </div>
         <div style={{display:"flex",gap:6,justifyContent:"flex-end",alignItems:"center"}}>
-          {pv
-            ?<button onClick={()=>{window.location.hash="";window.location.reload();}} style={{color:T.coral,fontSize:12,fontWeight:600,padding:"6px 10px",borderRadius:999,border:`1px solid ${T.coral}44`,fontFamily:F}}>↩</button>
-            :<>
+          {pv&&own&&<button onClick={()=>{window.location.hash="";window.location.reload();}} style={{color:T.coral,fontSize:12,fontWeight:600,padding:"6px 10px",borderRadius:999,border:`1px solid ${T.coral}44`,fontFamily:F}}>↩</button>}
+          <>
               <button onClick={()=>setSSetup(true)} style={{width:34,height:34,display:"flex",alignItems:"center",justifyContent:"center",background:T.card2,borderRadius:"50%",color:T.ink2}}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06-.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
               </button>
-              {lp&&<button onClick={()=>setSSh(true)} style={{background:T.coral,color:"#fff",fontSize:13,fontWeight:700,padding:"7px 12px",borderRadius:999,fontFamily:F}}>{S.share}</button>}
-            </>}
+              {!pv&&lp&&<button onClick={()=>setSSh(true)} style={{background:T.coral,color:"#fff",fontSize:13,fontWeight:700,padding:"7px 12px",borderRadius:999,fontFamily:F}}>{S.share}</button>}
+            </>
         </div>
       </nav>
 
@@ -502,13 +536,14 @@ export default function ShareCycle(){
 
       {/* Setup sheet */}
       {sSetup&&(
-        <div style={{...OV,animation:"fadeIn .2s"}} onClick={()=>lp&&setSSetup(false)}>
+        <div style={{...OV,animation:"fadeIn .2s"}} onClick={()=>(lp||pv)&&setSSetup(false)}>
           <div style={{...SB,animation:"slideUp .28s cubic-bezier(.22,1,.36,1)"}} onClick={e=>e.stopPropagation()}>
             <div style={HDL}/>
             <div style={SHD}>
               <span style={{fontSize:18,fontWeight:700,color:T.ink,fontFamily:F}}>{S.settings}</span>
-              {lp&&<button onClick={()=>setSSetup(false)} style={{color:T.coral,fontSize:16,fontWeight:600,fontFamily:F}}>{S.done}</button>}
+              {(lp||pv)&&<button onClick={()=>setSSetup(false)} style={{color:T.coral,fontSize:16,fontWeight:600,fontFamily:F}}>{S.done}</button>}
             </div>
+            {!pv&&(<div>
             <div style={{fontSize:11,fontWeight:700,letterSpacing:".1em",textTransform:"uppercase",color:T.muted,margin:"18px 2px 6px",fontFamily:F}}>{S.secName}</div>
             <div style={GRP}>
               <div style={{...ROW,borderBottom:"none"}}>
@@ -543,6 +578,7 @@ export default function ShareCycle(){
                 </div>
               </div>
             </div>
+            </div>)}
             <div style={{fontSize:11,fontWeight:700,letterSpacing:".1em",textTransform:"uppercase",color:T.muted,margin:"18px 2px 6px",fontFamily:F}}>{S.secAppearance}</div>
             <div style={GRP}>
               <div style={ROW}>
