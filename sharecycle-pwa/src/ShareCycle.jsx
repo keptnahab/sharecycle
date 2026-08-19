@@ -19,6 +19,7 @@ const MO={de:["Januar","Februar","März","April","Mai","Juni","Juli","August","S
   en:["January","February","March","April","May","June","July","August","September","October","November","December"]};
 const WD={de:["Mo","Di","Mi","Do","Fr","Sa","So"],en:["Mo","Tu","We","Th","Fr","Sa","Su"]};
 const SK="sc-v1";
+const PK="sc-pv1";
 const F="'Plus Jakarta Sans',-apple-system,sans-serif";
 
 const toD=d=>{const x=new Date(d);x.setHours(0,0,0,0);return x;};
@@ -28,25 +29,74 @@ const iso=d=>{const x=toD(d);const y=x.getFullYear(),m=String(x.getMonth()+1).pa
 const parse=s=>{const[y,m,d]=s.split("-").map(Number);return toD(new Date(y,m-1,d));};
 const niceFmt=(s,lang)=>s?parse(s).toLocaleDateString(lang==="en"?"en-US":"de-DE",{day:"2-digit",month:"long",year:"numeric"}):"";
 
-const phOf=(date,start,cl,pl,pmsOffset)=>{
-  if(!start)return"none";
-  const d=((dif(date,start)%cl)+cl)%cl,ov=cl-14;
-  const ps=pmsOffset!=null?pmsOffset:cl-5;
-  if(d<pl)return"period";
+// Minimum distance between two logged period starts. Anything closer is treated as a
+// correction of the existing entry, not as an additional cycle.
+const MINGAP=10;
+// Merge a newly logged start into the sorted list of starts, replacing any entry that is
+// close enough to be a correction of the same period.
+const putStart=(list,isoStr)=>{
+  const t=parse(isoStr);
+  const out=(list||[]).filter(x=>x!==isoStr&&Math.abs(dif(parse(x),t))>=MINGAP);
+  out.push(isoStr);out.sort();return out;
+};
+const delStart=(list,isoStr)=>(list||[]).filter(x=>x!==isoStr);
+
+// The cycle segment a date belongs to: the period start it follows, how long that cycle
+// actually lasted, and whether its start was logged (vs. extrapolated).
+// Cycles between two logged starts are measured from the real gap, so logging a new start
+// never shifts earlier months — only the open cycle and unlogged ones use the default `cl`.
+const segOf=(date,starts,cl)=>{
+  if(!starts||!starts.length)return null;
+  const d=toD(date);
+  let i=-1;
+  for(let k=0;k<starts.length;k++){if(dif(d,starts[k])>=0)i=k;else break;}
+  if(i<0){const back=Math.ceil(dif(starts[0],d)/cl);return{s:addD(starts[0],-back*cl),len:cl,logged:false};}
+  if(i<starts.length-1)return{s:starts[i],len:Math.max(dif(starts[i+1],starts[i]),2),logged:true};
+  const off=dif(d,starts[i]);
+  if(off<cl)return{s:starts[i],len:cl,logged:true};
+  return{s:addD(starts[i],Math.floor(off/cl)*cl),len:cl,logged:false};
+};
+const phOf=(date,seg,pl,pmsOffset)=>{
+  if(!seg)return"none";
+  const cl=seg.len,d=dif(date,seg.s),ov=cl-14;
+  const ps=pmsOffset!=null&&pmsOffset>0&&pmsOffset<cl?pmsOffset:cl-5;
+  if(d<Math.min(pl,cl))return"period";
   if(d<ov-5)return"follicular";
   if(d<=ov+2)return"ovulation";
   if(d<ps)return"luteal";
   return"pms";
 };
-const isPeak=(date,start,cl)=>!!start&&((dif(date,start)%cl)+cl)%cl===cl-14;
-const isFertile=(date,start,cl)=>{if(!start)return false;const d=((dif(date,start)%cl)+cl)%cl,ov=cl-14;return(d>=ov-5&&d<ov)||(d>ov&&d<=ov+2);};
-const cycDay=(date,start,cl)=>start?(((dif(date,start)%cl)+cl)%cl)+1:null;
-const nextPer=(start,cl,ref)=>{if(!start)return null;const t=ref?toD(ref):toD(new Date());let n=toD(start);while(n<=t)n=addD(n,cl);return n;};
-const nextOvu=(start,cl,ref)=>{if(!start)return null;const t=ref?toD(ref):toD(new Date());let b=toD(start);while(addD(b,cl)<=t)b=addD(b,cl);const o=addD(b,cl-14);return o>=t?o:addD(addD(b,cl),cl-14);};
+// The luteal→PMS boundary for a segment: a PMS start logged inside that cycle wins; cycles
+// after the newest logged one inherit its offset as a refined estimate; older cycles without
+// a log keep the default (len-5). Logging a PMS start therefore never repaints past months.
+const pmsFor=(seg,pmsStarts,lastOff)=>{
+  if(!seg)return null;
+  for(let k=(pmsStarts||[]).length-1;k>=0;k--){
+    const o=dif(pmsStarts[k],seg.s);
+    if(o>=0&&o<seg.len)return{off:o,logged:true};
+  }
+  const last=pmsStarts&&pmsStarts.length?pmsStarts[pmsStarts.length-1]:null;
+  if(last&&lastOff!=null&&lastOff<seg.len&&dif(seg.s,last)>0)return{off:lastOff,logged:false};
+  return null;
+};
+const isPeak=(date,seg)=>!!seg&&dif(date,seg.s)===seg.len-14;
+const isFertile=(date,seg)=>{if(!seg)return false;const d=dif(date,seg.s),ov=seg.len-14;return(d>=ov-5&&d<ov)||(d>ov&&d<=ov+2);};
+const cycDay=(date,seg)=>seg?dif(date,seg.s)+1:null;
+const nextPer=(ref,starts,cl)=>{const a=segOf(ref,starts,cl);return a?addD(a.s,a.len):null;};
+const nextOvu=(ref,starts,cl)=>{
+  const a=segOf(ref,starts,cl);if(!a)return null;
+  const o=addD(a.s,a.len-14);if(dif(o,ref)>=0)return o;
+  const b=segOf(addD(a.s,a.len),starts,cl);return b?addD(b.s,b.len-14):null;
+};
 const encShare=(d,sp,sxt)=>btoa(unescape(encodeURIComponent(JSON.stringify({...d,sp,sxt}))));
 const decShare=h=>{try{return JSON.parse(decodeURIComponent(escape(atob(h))));}catch{return null;}};
 const loadLS=()=>{try{const r=localStorage.getItem(SK);return r?JSON.parse(r):null;}catch{return null;}};
 const saveLS=s=>{try{localStorage.setItem(SK,JSON.stringify(s));}catch{}};
+// Partner view: the last opened share payload plus that viewer's own appearance prefs.
+// Kept separately from `sc-v1` so a partner never owns cycle data — and so a share link
+// added to the home screen still works when the launcher drops the `#p=` fragment.
+const loadPV=()=>{try{const r=localStorage.getItem(PK);return r?JSON.parse(r):null;}catch{return null;}};
+const savePV=s=>{try{localStorage.setItem(PK,JSON.stringify(s));}catch{}};
 const pxy=(cx,cy,r,a)=>{const rad=(a-90)*Math.PI/180;return{x:cx+r*Math.cos(rad),y:cy+r*Math.sin(rad)};};
 
 const PLBL={de:{period:"Periode",follicular:"Follikelphase",ovulation:"Eisprung",luteal:"Lutealphase",pms:"PMS",none:"—"},
@@ -84,6 +134,8 @@ const STR={
     googleCal:"Google Kalender",addNextPeriod:"Nächste Periode eintragen",
     setPeriodStart:"Periodenbeginn setzen",setPeriodStartSub:"Starttag der Periode eintragen",
     setPmsStart:"PMS-Beginn setzen",setPmsStartSub:"Tatsächlichen PMS-Start eintragen",
+    delPeriodStart:"Periodenbeginn entfernen",delPeriodStartSub:"Diesen eingetragenen Start wieder löschen",
+    delPmsStart:"PMS-Beginn entfernen",delPmsStartSub:"Diesen eingetragenen PMS-Start wieder löschen",
     periodEvent:"Periode",ovulationEvent:"Eisprung"},
   en:{share:"Share",pPeriod:"Period",pFollicular:"Follicular",pOvulation:"Ovulation",pLuteal:"Luteal",pPms:"PMS",
     day:"Day",of:"of",today:"Today",nextPeriod:"Next period",cycleDay:"Cycle day",
@@ -99,12 +151,14 @@ const STR={
     googleCal:"Google Calendar",addNextPeriod:"Add next period",
     setPeriodStart:"Set period start",setPeriodStartSub:"Log the first day of the period",
     setPmsStart:"Set PMS start",setPmsStartSub:"Log the actual PMS start",
+    delPeriodStart:"Remove period start",delPeriodStartSub:"Delete this logged start again",
+    delPmsStart:"Remove PMS start",delPmsStartSub:"Delete this logged PMS start again",
     periodEvent:"Period",ovulationEvent:"Ovulation"}
 };
 
 export default function ShareCycle(){
   const[nm,setNm]=useState("");
-  const[lp,setLp]=useState("");
+  const[ps,setPs]=useState([]);
   const[cl,setCl]=useState(28);
   const[pl,setPl]=useState(5);
   const[dk,setDk]=useState(true);
@@ -130,37 +184,73 @@ export default function ShareCycle(){
   const lpTimer=React.useRef(null);
   const calScrolled=React.useRef(false);
   const curMonthRef=React.useRef(null);
-  const[lps,setLps]=useState("");
+  const[pss,setPss]=useState([]);
   const[pv,setPv]=useState(null);
+  const[pvRaw,setPvRaw]=useState("");
+  const[own,setOwn]=useState(false);
 
   useEffect(()=>{
     const h=window.location.hash.replace(/^#/,"");
-    if(h.startsWith("p=")){const d=decShare(h.slice(2));if(d?.lp){setPv(d);return;}}
     const s=loadLS();
-    if(s?.lp){setNm(s.nm||"");setLp(s.lp);setCl(s.cl||28);setPl(s.pl||5);if(s.dk!==undefined)setDk(s.dk);if(s.lps)setLps(s.lps);setLg(s.lg!==undefined?s.lg:"de");}
+    setOwn(!!s?.lp);
+    // Own data always wins without a hash; a stored share payload only steps in for a
+    // device that has none (partner who installed the link to the home screen).
+    const pvs=loadPV();
+    const raw=h.startsWith("p=")?h.slice(2):(!s?.lp&&pvs?.p?pvs.p:"");
+    if(raw){
+      const d=decShare(raw);
+      if(d?.lp){
+        setPv(d);setPvRaw(raw);
+        const pref=pvs||s;
+        if(pref?.dk!==undefined)setDk(pref.dk);
+        if(pref?.lg!==undefined)setLg(pref.lg);
+        return;
+      }
+    }
+    // `ps` (period-start history) was added later — older entries only carry `lp`.
+    if(s?.lp){setNm(s.nm||"");setPs(s.ps&&s.ps.length?s.ps.slice().sort():[s.lp]);setCl(s.cl||28);setPl(s.pl||5);if(s.dk!==undefined)setDk(s.dk);setPss(s.pss&&s.pss.length?s.pss.slice().sort():(s.lps?[s.lps]:[]));setLg(s.lg!==undefined?s.lg:"de");}
     else setSSetup(true);
   },[]);
 
-  useEffect(()=>{if(lp)saveLS({nm,lp,cl,pl,dk,lps,lg});},[nm,lp,cl,pl,dk,lps,lg]);
+  const lp=ps.length?ps[ps.length-1]:"";
+  const lps=pss.length?pss[pss.length-1]:"";
+  useEffect(()=>{if(lp)saveLS({nm,lp,ps,cl,pl,dk,lps,pss,lg});},[nm,lp,ps,cl,pl,dk,lps,pss,lg]);
   useEffect(()=>{try{document.documentElement.lang=lg;}catch{}},[lg]);
+  useEffect(()=>{if(pvRaw)savePV({p:pvRaw,dk,lg});},[pvRaw,dk,lg]);
+  // "Add to Home Screen" would follow the manifest's start_url ("/") and drop the `#p=`
+  // payload, so the partner view drops the manifest and puts its own URL back in place.
+  useEffect(()=>{
+    if(!pvRaw)return;
+    try{
+      document.querySelectorAll('link[rel="manifest"]').forEach(el=>el.remove());
+      if(!window.location.hash)history.replaceState(null,"","#p="+pvRaw);
+    }catch{}
+  },[pvRaw]);
 
   const T=dk?DK:LK;
   const L=lg,S=STR[L];
   const today=useMemo(()=>toD(new Date()),[]);
-  const ad=pv?{nm:pv.nm||"",lp:pv.lp,cl:pv.cl||28,pl:pv.pl||5,lps:"",sp:pv.sp||{period:true,follicular:true,ovulation:true,luteal:true,pms:true},sxt:pv.sxt!==false}:{nm,lp,cl,pl,lps,sp:{period:true,follicular:true,ovulation:true,luteal:true,pms:true},sxt:true};
+  const ad=pv?{nm:pv.nm||"",lp:pv.lp,ps:pv.ps&&pv.ps.length?pv.ps:[pv.lp],cl:pv.cl||28,pl:pv.pl||5,pss:[],sp:pv.sp||{period:true,follicular:true,ovulation:true,luteal:true,pms:true},sxt:pv.sxt!==false}:{nm,lp,ps,cl,pl,pss,sp:{period:true,follicular:true,ovulation:true,luteal:true,pms:true},sxt:true};
   const as=ad.lp?parse(ad.lp):null;
-  const pmsOffset=ad.lps&&as?(((dif(parse(ad.lps),as)%ad.cl)+ad.cl)%ad.cl):null;
+  const starts=ad.ps.filter(Boolean).map(parse);
+  const pmsStarts=ad.pss.filter(Boolean).map(parse);
+  const lastPms=pmsStarts.length?pmsStarts[pmsStarts.length-1]:null;
+  const lastPmsSeg=lastPms?segOf(lastPms,starts,ad.cl):null;
+  const lastPmsOff=lastPmsSeg?dif(lastPms,lastPmsSeg.s):null;
   const fd=sel||today,itd=dif(fd,today)===0;
-  const ph=phOf(fd,as,ad.cl,ad.pl,pmsOffset);
-  const fdc=cycDay(fd,as,ad.cl);
-  const np=nextPer(as,ad.cl,fd),du=np?dif(np,fd):null;
-  const no=nextOvu(as,ad.cl,fd),dto=no?dif(no,fd):null;
+  const fdSeg=segOf(fd,starts,ad.cl);
+  const fdLen=fdSeg?fdSeg.len:ad.cl;
+  const fdPms=pmsFor(fdSeg,pmsStarts,lastPmsOff);
+  const ph=phOf(fd,fdSeg,ad.pl,fdPms?fdPms.off:null);
+  const fdc=cycDay(fd,fdSeg);
+  const np=nextPer(fd,starts,ad.cl),du=np?dif(np,fd):null;
+  const no=nextOvu(fd,starts,ad.cl),dto=no?dif(no,fd):null;
 
   const pCol=c=>c==="period"?T.coral:c==="ovulation"?T.gold:c==="pms"?T.mauve:c==="follicular"?T.follicular:c==="luteal"?T.luteal:T.muted;
   const pc=pCol(ph);
   const plbl=PLBL[L][ph]||"—";
 
-  const fillDeg=fdc&&ad.cl?fdc/ad.cl*360:0;
+  const fillDeg=fdc&&fdLen?fdc/fdLen*360:0;
   const dotPos=fdc?pxy(80,80,58,fillDeg):null;
   const fp=fillDeg>0?(()=>{const p1=pxy(80,80,58,0),p2=pxy(80,80,58,Math.min(fillDeg,359.9)),lg=fillDeg>180?1:0;return`M${p1.x} ${p1.y}A58 58 0 ${lg} 1 ${p2.x} ${p2.y}`;})():null;
 
@@ -196,8 +286,8 @@ export default function ShareCycle(){
     return()=>{cancelAnimationFrame(raf);clearTimeout(t);};
   },[ad.lp]);
 
-  const slink=useMemo(()=>lp?`${location.origin}${location.pathname}#p=${encShare({nm,lp,cl,pl},sp,sxt)}`:"",
-    [nm,lp,cl,pl,sp,sxt]);
+  const slink=useMemo(()=>lp?`${location.origin}${location.pathname}#p=${encShare({nm,lp,ps,cl,pl},sp,sxt)}`:"",
+    [nm,lp,ps,cl,pl,sp,sxt]);
 
   const dlIcal=()=>{
     if(!as)return;
@@ -230,6 +320,7 @@ export default function ShareCycle(){
   const ROW={display:"flex",justifyContent:"space-between",alignItems:"center",padding:"13px 16px",minHeight:48,borderBottom:`1px solid ${T.line}`};
 
   const startLP=(isoStr)=>{
+    if(pv)return;
     cancelLP();
     lpTimer.current=setTimeout(()=>setLpChoice(isoStr),700);
   };
@@ -242,20 +333,22 @@ export default function ShareCycle(){
     const dayCells=[];
     for(let ci=0;ci<cells.length;ci++){
       const{date,in:inM}=cells[ci];
-      const p=as?phOf(date,as,ad.cl,ad.pl,pmsOffset):"none";
-      const cdNum=as&&inM?cycDay(date,as,ad.cl):null;
-      const solidPeriod=p==="period"&&as&&dif(date,as)>=0&&dif(date,as)<ad.pl;
-      const lpsParsed=ad.lps?parse(ad.lps):null;
-      const pmsLen=pmsOffset!=null?ad.cl-pmsOffset:5;
-      const solidPMS=p==="pms"&&lpsParsed&&dif(date,lpsParsed)>=0&&dif(date,lpsParsed)<pmsLen;
+      const seg=segOf(date,starts,ad.cl);
+      const pmsInfo=pmsFor(seg,pmsStarts,lastPmsOff);
+      const p=phOf(date,seg,ad.pl,pmsInfo?pmsInfo.off:null);
+      const cdNum=seg&&inM?cycDay(date,seg):null;
+      // Solid (vs. hatched) = this period start was actually logged, not predicted.
+      const solidPeriod=p==="period"&&!!seg&&seg.logged;
+      // Solid (vs. hatched) = the PMS start of this cycle was actually logged, not estimated.
+      const solidPMS=p==="pms"&&!!pmsInfo&&pmsInfo.logged;
       const isT=dif(date,today)===0,isSel=sel&&dif(date,sel)===0;
       const vis=pv?true:((p==="period"&&spd)||(p==="follicular"&&sfl)||(p==="ovulation"&&sov)||(p==="luteal"&&slt)||(p==="pms"&&spm));
       const partOk=!pv||ad.sp[p]!==false;
       const show=vis&&partOk;
       // Ovulation bloom: petals grow 15→20→15px and redden toward the peak day, palest at the window edges.
       let ovSize=0,ovCol="";
-      if(show&&p==="ovulation"&&as){
-        const doff=((dif(date,as)%ad.cl)+ad.cl)%ad.cl,ovd=ad.cl-14,dd=doff-ovd;
+      if(show&&p==="ovulation"&&seg){
+        const doff=dif(date,seg.s),ovd=seg.len-14,dd=doff-ovd;
         const c=Math.max(0,Math.min(1,dd<=0?(dd+5)/5:(2-dd)/2));
         ovSize=Math.round(15+c*5);
         ovCol=`rgb(255,${Math.round(235-c*190)},${Math.round(235-c*180)})`;
@@ -277,7 +370,7 @@ export default function ShareCycle(){
       if(isT)border=`2.5px solid ${T.ink}`;
       if(isSel)border=`2.5px solid ${T.coral}`;
       dayCells.push(
-        <button key={ci} data-date={iso(date)} onClick={()=>setSel(isSel?null:date)} onTouchStart={e=>{const d=e.currentTarget.getAttribute("data-date");if(d)startLP(d);}} onTouchEnd={cancelLP} onTouchMove={cancelLP} onMouseDown={e=>{if(e.button!==0)return;const d=e.currentTarget.getAttribute("data-date");if(d)startLP(d);}} onMouseUp={cancelLP} onMouseLeave={cancelLP} onContextMenu={e=>{e.preventDefault();const d=e.currentTarget.getAttribute("data-date");if(d)setLpChoice(d);}} style={{aspectRatio:"1/1",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",borderRadius:11,background:bg,border,opacity:inM?1:.3,position:"relative",fontFamily:F,cursor:"pointer",boxShadow:isSel?`0 0 0 3px ${T.coral}44`:"none",userSelect:"none",WebkitUserSelect:"none"}}>
+        <button key={ci} data-date={iso(date)} onClick={()=>setSel(isSel?null:date)} onTouchStart={e=>{const d=e.currentTarget.getAttribute("data-date");if(d)startLP(d);}} onTouchEnd={cancelLP} onTouchMove={cancelLP} onMouseDown={e=>{if(e.button!==0)return;const d=e.currentTarget.getAttribute("data-date");if(d)startLP(d);}} onMouseUp={cancelLP} onMouseLeave={cancelLP} onContextMenu={e=>{e.preventDefault();if(pv)return;const d=e.currentTarget.getAttribute("data-date");if(d)setLpChoice(d);}} style={{aspectRatio:"1/1",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",borderRadius:11,background:bg,border,opacity:inM?1:.3,position:"relative",fontFamily:F,cursor:"pointer",boxShadow:isSel?`0 0 0 3px ${T.coral}44`:"none",userSelect:"none",WebkitUserSelect:"none"}}>
           {cdNum&&<span style={{position:"absolute",top:2,right:3,fontSize:12,fontWeight:600,color:dayCol,opacity:.65,lineHeight:1,fontFamily:F}}>{cdNum}</span>}
           <span style={{fontSize:15,fontWeight:fw,color:dayCol,lineHeight:1}}>{date.getDate()}</span>
           {ovSize>0&&(
@@ -331,18 +424,19 @@ export default function ShareCycle(){
         <img src="/sharecycle-symbol.png" alt="ShareCycle" width="34" height="34" style={{display:"block",objectFit:"contain"}}/>
         <div style={{textAlign:"center"}}>
           {ad.nm
-            ?<button onClick={()=>{setNi(ad.nm);setSNm(true);}} style={{fontSize:16,fontWeight:700,color:T.coral,padding:"4px 12px",borderRadius:999,border:`1px solid ${T.coral}44`,fontFamily:F}}>{ad.nm}</button>
+            ?(pv
+              ?<span style={{display:"inline-block",fontSize:16,fontWeight:700,color:T.coral,padding:"4px 12px",borderRadius:999,border:`1px solid ${T.coral}44`,fontFamily:F}}>{ad.nm}</span>
+              :<button onClick={()=>{setNi(ad.nm);setSNm(true);}} style={{fontSize:16,fontWeight:700,color:T.coral,padding:"4px 12px",borderRadius:999,border:`1px solid ${T.coral}44`,fontFamily:F}}>{ad.nm}</button>)
             :<span style={{fontSize:16,fontWeight:700,fontFamily:F}}><span style={{color:T.ink}}>Share</span><span style={{color:T.coral}}>Cycle</span></span>}
         </div>
         <div style={{display:"flex",gap:6,justifyContent:"flex-end",alignItems:"center"}}>
-          {pv
-            ?<button onClick={()=>{window.location.hash="";window.location.reload();}} style={{color:T.coral,fontSize:12,fontWeight:600,padding:"6px 10px",borderRadius:999,border:`1px solid ${T.coral}44`,fontFamily:F}}>↩</button>
-            :<>
+          {pv&&own&&<button onClick={()=>{window.location.hash="";window.location.reload();}} style={{color:T.coral,fontSize:12,fontWeight:600,padding:"6px 10px",borderRadius:999,border:`1px solid ${T.coral}44`,fontFamily:F}}>↩</button>}
+          <>
               <button onClick={()=>setSSetup(true)} style={{width:34,height:34,display:"flex",alignItems:"center",justifyContent:"center",background:T.card2,borderRadius:"50%",color:T.ink2}}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06-.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
               </button>
-              {lp&&<button onClick={()=>setSSh(true)} style={{background:T.coral,color:"#fff",fontSize:13,fontWeight:700,padding:"7px 12px",borderRadius:999,fontFamily:F}}>{S.share}</button>}
-            </>}
+              {!pv&&lp&&<button onClick={()=>setSSh(true)} style={{background:T.coral,color:"#fff",fontSize:13,fontWeight:700,padding:"7px 12px",borderRadius:999,fontFamily:F}}>{S.share}</button>}
+            </>
         </div>
       </nav>
 
@@ -368,13 +462,13 @@ export default function ShareCycle(){
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
               <div style={{display:"flex",alignItems:"baseline",gap:8}}>
                 <span style={{fontSize:20,fontWeight:800,color:pc,fontFamily:F,lineHeight:1}}>{plbl}</span>
-                <span style={{fontSize:12,color:T.muted,fontFamily:F}}>{ad.nm?S.day+" "+fdc+" · "+ad.nm:S.day+" "+fdc+" "+S.of+" "+ad.cl}</span>
+                <span style={{fontSize:12,color:T.muted,fontFamily:F}}>{ad.nm?S.day+" "+fdc+" · "+ad.nm:S.day+" "+fdc+" "+S.of+" "+fdLen}</span>
               </div>
               {!itd&&<button onClick={()=>setSel(null)} style={{fontSize:11,color:T.coral,padding:"3px 10px",border:`1px solid ${T.coral}55`,borderRadius:999,background:"none",fontFamily:F,fontWeight:600}}>{"← "+S.today}</button>}
             </div>
             {/* Progress bar */}
             <div style={{height:6,borderRadius:3,background:T.card3,marginBottom:10,overflow:"hidden"}}>
-              <div style={{height:"100%",width:`${Math.round((fdc/ad.cl)*100)}%`,borderRadius:3,background:pc,transition:"width .3s"}}/>
+              <div style={{height:"100%",width:`${Math.round(Math.min(fdc/fdLen,1)*100)}%`,borderRadius:3,background:pc,transition:"width .3s"}}/>
             </div>
             {pv&&ad.sxt&&ad.sp[ph]!==false&&PTXT[L][ph]&&<div style={{fontSize:12,color:T.ink2,lineHeight:1.4,marginTop:8,fontFamily:F}}>{PTXT[L][ph]}</div>}
             {/* Row 2: facts */}
@@ -391,7 +485,7 @@ export default function ShareCycle(){
               )}
               {!((!pv||ad.sp.ovulation)&&dto!=null)&&(
                 <div style={{flex:1,paddingLeft:14}}>
-                  <div style={{fontSize:15,fontWeight:700,color:T.ink2,fontFamily:F,lineHeight:1}}>{fdc}/{ad.cl}</div>
+                  <div style={{fontSize:15,fontWeight:700,color:T.ink2,fontFamily:F,lineHeight:1}}>{fdc}/{fdLen}</div>
                   <div style={{fontSize:9,fontWeight:700,letterSpacing:".08em",textTransform:"uppercase",color:T.muted,fontFamily:F,marginTop:2}}>{S.cycleDay}</div>
                 </div>
               )}
@@ -442,13 +536,14 @@ export default function ShareCycle(){
 
       {/* Setup sheet */}
       {sSetup&&(
-        <div style={{...OV,animation:"fadeIn .2s"}} onClick={()=>lp&&setSSetup(false)}>
+        <div style={{...OV,animation:"fadeIn .2s"}} onClick={()=>(lp||pv)&&setSSetup(false)}>
           <div style={{...SB,animation:"slideUp .28s cubic-bezier(.22,1,.36,1)"}} onClick={e=>e.stopPropagation()}>
             <div style={HDL}/>
             <div style={SHD}>
               <span style={{fontSize:18,fontWeight:700,color:T.ink,fontFamily:F}}>{S.settings}</span>
-              {lp&&<button onClick={()=>setSSetup(false)} style={{color:T.coral,fontSize:16,fontWeight:600,fontFamily:F}}>{S.done}</button>}
+              {(lp||pv)&&<button onClick={()=>setSSetup(false)} style={{color:T.coral,fontSize:16,fontWeight:600,fontFamily:F}}>{S.done}</button>}
             </div>
+            {!pv&&(<div>
             <div style={{fontSize:11,fontWeight:700,letterSpacing:".1em",textTransform:"uppercase",color:T.muted,margin:"18px 2px 6px",fontFamily:F}}>{S.secName}</div>
             <div style={GRP}>
               <div style={{...ROW,borderBottom:"none"}}>
@@ -483,6 +578,7 @@ export default function ShareCycle(){
                 </div>
               </div>
             </div>
+            </div>)}
             <div style={{fontSize:11,fontWeight:700,letterSpacing:".1em",textTransform:"uppercase",color:T.muted,margin:"18px 2px 6px",fontFamily:F}}>{S.secAppearance}</div>
             <div style={GRP}>
               <div style={ROW}>
@@ -500,7 +596,7 @@ export default function ShareCycle(){
               </div>
             </div>
             {lp&&<button onClick={()=>setSSetup(false)} style={{display:"block",width:"100%",background:T.coral,color:"#fff",fontSize:16,fontWeight:700,padding:15,borderRadius:16,border:"none",cursor:"pointer",marginTop:16,fontFamily:F}}>{S.save}</button>}
-            {lp&&<button onClick={()=>{if(confirm(S.confirmDelete)){localStorage.removeItem(SK);setNm("");setLp("");setLps("");setCl(28);setPl(5);setSSetup(true);}}} style={{display:"block",width:"100%",background:T.mauve+"22",color:"#FF453A",fontSize:15,fontWeight:500,padding:14,borderRadius:14,marginTop:10,cursor:"pointer",border:"none",fontFamily:F}}>{S.deleteAll}</button>}
+            {lp&&<button onClick={()=>{if(confirm(S.confirmDelete)){localStorage.removeItem(SK);setNm("");setPs([]);setPss([]);setCl(28);setPl(5);setSSetup(true);}}} style={{display:"block",width:"100%",background:T.mauve+"22",color:"#FF453A",fontSize:15,fontWeight:500,padding:14,borderRadius:14,marginTop:10,cursor:"pointer",border:"none",fontFamily:F}}>{S.deleteAll}</button>}
             <p style={{fontSize:12,color:T.muted,textAlign:"center",marginTop:18,lineHeight:1.5,fontFamily:F}}>{S.localNote}</p>
           </div>
         </div>
@@ -514,7 +610,7 @@ export default function ShareCycle(){
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",paddingBottom:14,borderBottom:`1px solid ${T.line}`,marginBottom:0}}>
               <button onClick={()=>setSDp(false)} style={{fontSize:16,color:T.muted,fontFamily:F}}>{S.cancel}</button>
               <span style={{fontSize:16,fontWeight:700,color:T.ink,fontFamily:F}}>{S.chooseDate}</span>
-              <button onClick={()=>{if(dpS){setLp(dpS);setSDp(false);}}} style={{fontSize:16,fontWeight:700,color:T.coral,opacity:dpS?1:.3,fontFamily:F}}>{S.done}</button>
+              <button onClick={()=>{if(dpS){setPs(o=>putStart(o.filter(x=>x<dpS),dpS));setSDp(false);}}} style={{fontSize:16,fontWeight:700,color:T.coral,opacity:dpS?1:.3,fontFamily:F}}>{S.done}</button>
             </div>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 0 8px"}}>
               <button onClick={()=>{if(dpM===0){setDpM(11);setDpY(y=>y-1);}else setDpM(m=>m-1);}} style={{width:36,height:36,borderRadius:"50%",background:T.card2,fontSize:20,color:T.coral,display:"flex",alignItems:"center",justifyContent:"center"}}>‹</button>
@@ -599,20 +695,38 @@ export default function ShareCycle(){
             <div style={{textAlign:"center",fontSize:15,fontWeight:600,color:T.ink2,fontFamily:F,paddingBottom:16}}>
               {parse(lpChoice).toLocaleDateString(L==="en"?"en-US":"de-DE",{weekday:"long",day:"2-digit",month:"long"})}
             </div>
-            <button onClick={()=>{setLp(lpChoice);setSel(null);setLpChoice(null);}} style={{display:"flex",alignItems:"center",gap:12,width:"100%",background:T.coral+"22",border:`1.5px solid ${T.coral}55`,borderRadius:16,padding:"14px 18px",marginBottom:10,cursor:"pointer",fontFamily:F}}>
+            <button onClick={()=>{setPs(o=>putStart(o,lpChoice));setSel(null);setLpChoice(null);}} style={{display:"flex",alignItems:"center",gap:12,width:"100%",background:T.coral+"22",border:`1.5px solid ${T.coral}55`,borderRadius:16,padding:"14px 18px",marginBottom:10,cursor:"pointer",fontFamily:F}}>
               <span style={{fontSize:22}}>🩸</span>
               <div style={{textAlign:"left"}}>
                 <div style={{fontSize:15,fontWeight:700,color:T.coral,fontFamily:F}}>{S.setPeriodStart}</div>
                 <div style={{fontSize:12,color:T.muted,fontFamily:F,marginTop:2}}>{S.setPeriodStartSub}</div>
               </div>
             </button>
-            <button onClick={()=>{setLps(lpChoice);setSel(null);setLpChoice(null);}} style={{display:"flex",alignItems:"center",gap:12,width:"100%",background:T.mauve+"22",border:`1.5px solid ${T.mauve}55`,borderRadius:16,padding:"14px 18px",marginBottom:10,cursor:"pointer",fontFamily:F}}>
+            <button onClick={()=>{setPss(o=>putStart(o,lpChoice));setSel(null);setLpChoice(null);}} style={{display:"flex",alignItems:"center",gap:12,width:"100%",background:T.mauve+"22",border:`1.5px solid ${T.mauve}55`,borderRadius:16,padding:"14px 18px",marginBottom:10,cursor:"pointer",fontFamily:F}}>
               <span style={{fontSize:22}}>🌙</span>
               <div style={{textAlign:"left"}}>
                 <div style={{fontSize:15,fontWeight:700,color:T.mauve,fontFamily:F}}>{S.setPmsStart}</div>
                 <div style={{fontSize:12,color:T.muted,fontFamily:F,marginTop:2}}>{S.setPmsStartSub}</div>
               </div>
             </button>
+            {pss.indexOf(lpChoice)>=0&&(
+              <button onClick={()=>{setPss(o=>delStart(o,lpChoice));setSel(null);setLpChoice(null);}} style={{display:"flex",alignItems:"center",gap:12,width:"100%",background:T.card2,border:`1.5px solid ${T.line2}`,borderRadius:16,padding:"14px 18px",marginBottom:10,cursor:"pointer",fontFamily:F}}>
+                <span style={{fontSize:22}}>🗑</span>
+                <div style={{textAlign:"left"}}>
+                  <div style={{fontSize:15,fontWeight:700,color:T.ink2,fontFamily:F}}>{S.delPmsStart}</div>
+                  <div style={{fontSize:12,color:T.muted,fontFamily:F,marginTop:2}}>{S.delPmsStartSub}</div>
+                </div>
+              </button>
+            )}
+            {ps.length>1&&ps.indexOf(lpChoice)>=0&&(
+              <button onClick={()=>{setPs(o=>delStart(o,lpChoice));setSel(null);setLpChoice(null);}} style={{display:"flex",alignItems:"center",gap:12,width:"100%",background:T.card2,border:`1.5px solid ${T.line2}`,borderRadius:16,padding:"14px 18px",marginBottom:10,cursor:"pointer",fontFamily:F}}>
+                <span style={{fontSize:22}}>🗑</span>
+                <div style={{textAlign:"left"}}>
+                  <div style={{fontSize:15,fontWeight:700,color:T.ink2,fontFamily:F}}>{S.delPeriodStart}</div>
+                  <div style={{fontSize:12,color:T.muted,fontFamily:F,marginTop:2}}>{S.delPeriodStartSub}</div>
+                </div>
+              </button>
+            )}
             <button onClick={()=>setLpChoice(null)} style={{display:"block",width:"100%",padding:"12px 0",borderRadius:16,background:T.card2,color:T.muted,fontSize:14,fontWeight:600,fontFamily:F,border:"none",cursor:"pointer"}}>{S.cancel}</button>
           </div>
         </div>

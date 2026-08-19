@@ -20,31 +20,73 @@ ShareCycle is a privacy-first menstrual cycle tracking PWA. All user data stays 
 
 **Data model** (localStorage key `sc-v1`):
 ```js
-{ nm, lp, cl, pl, dk, lps, lg }
-// name, last-period date (ISO), cycle length (days), period length (days), dark-mode bool,
-// lps = logged PMS start date (ISO, optional). When set, phOf() shifts the luteal→PMS
-// boundary to this actual start instead of the default cl-5 estimate. Absent on older data.
+{ nm, lp, ps, cl, pl, dk, lps, pss, lg }
+// name, last-period date (ISO), ps = period-start history (array of ISO dates, ascending),
+// cycle length (days), period length (days), dark-mode bool,
+// lps = newest logged PMS start (ISO, optional), pss = PMS-start history (array of ISO
+// dates, ascending, optional). A PMS start shifts the luteal→PMS boundary of *its own*
+// cycle to the actual start instead of the default len-5 estimate. Absent on older data.
 // lg = UI language "de" | "en" (optional). Absent on older data → treated as "de".
 ```
+`ps`/`pss` are the source of truth for everything the calendar shows; `lp`/`lps` are kept
+as their last elements for backwards compatibility (older data / older share links carry
+only `lp` and `lps`, migrated to `ps: [lp]` / `pss: [lps]` on load).
 
 **Core pure utilities** (all in ShareCycle.jsx):
 | Function | Purpose |
 |----------|---------|
-| `phOf(date)` | Returns cycle phase for a date: `period`, `follicular`, `ovulation`, `luteal`, `pms` |
-| `cycDay(date)` | Cycle day number (1-based) |
-| `isPeak(date)` | True on peak ovulation day |
-| `isFertile(date)` | True in the fertile window |
-| `nextPer()` / `nextOvu()` | Predict next period / ovulation date |
+| `segOf(date, starts, cl)` | The cycle segment a date falls into: `{s, len, logged}` — see below |
+| `pmsFor(seg, pmsStarts, lastOff)` | The luteal→PMS boundary of a segment: `{off, logged}` |
+| `phOf(date, seg)` | Returns cycle phase for a date: `period`, `follicular`, `ovulation`, `luteal`, `pms` |
+| `cycDay(date, seg)` | Cycle day number (1-based) |
+| `isPeak(date, seg)` | True on peak ovulation day |
+| `isFertile(date, seg)` | True in the fertile window |
+| `nextPer()` / `nextOvu()` | Next period / ovulation date relative to a reference date |
+| `putStart()` / `delStart()` | Add/correct/remove an entry in the period-start history |
 | `encShare()` / `decShare()` | Base64-URL encode/decode cycle data for sharing |
 | `loadLS()` / `saveLS()` | Read/write the `sc-v1` localStorage entry |
 
-**URL sharing:** Share links use hash fragments (`#p=<base64>`). The app detects these on load and enters a read-only preview mode. The share payload is `{nm,lp,cl,pl,sp,sxt}`:
+**Past cycles never move (fixed 2026-08-19):** every date is resolved through `segOf()`,
+which anchors it to the last *logged* period start at or before it. A cycle bounded by two
+logged starts uses the real gap between them as its length, so its phases stay put forever;
+only the open (latest) cycle and cycles with no logged start are extrapolated with the
+default `cl`. Logging a new period start therefore never repaints earlier months — the bug
+where it did came from computing every date as `dif(date, lp) % cl`. Logged period starts
+render solid in the calendar, predicted/extrapolated ones hatched. Two starts closer than
+`MINGAP` (10 days) are treated as a correction of the same entry, not as two cycles; a
+logged start can be removed again via long-press (only while more than one exists).
+
+The same holds for PMS starts (`pss`): `pmsFor()` resolves the luteal→PMS boundary **per
+cycle** — a PMS start logged inside a cycle wins there, cycles *after* the newest logged one
+inherit its offset as a refined estimate (so predictions still benefit), and earlier cycles
+without a log keep the default `len-5`. Logging a PMS start therefore never repaints past
+months either. Logged PMS days render solid, estimated ones hatched; a logged PMS start can
+be removed again via long-press.
+
+**URL sharing:** Share links use hash fragments (`#p=<base64>`). The app detects these on load and enters a read-only preview mode. The share payload is `{nm,lp,ps,cl,pl,sp,sxt}` (`ps` so the partner sees the same past
+months; links without it fall back to `[lp]`):
 - `sp` — object of 5 phase booleans (`period`, `follicular`, `ovulation`, `luteal`, `pms`) controlling which phases are visible to the partner
 - `sxt` — boolean toggling whether partner-friendly explanation texts are shown
 
 Older links without `sp` are treated defensively as "everything visible". The `PTXT` constant holds 5 warm, short partner-facing explanation texts (one per phase), shown only in the partner preview (hero card) when `sxt` is on and the current phase is shared.
 
 Default `sp` when opening the share sheet for the first time: `{period:true,follicular:false,ovulation:true,luteal:false,pms:true}` — period/ovulation/PMS are the phases most relevant to a partner, follicular/luteal are off by default. `sxt` (explanation texts) defaults to `true`.
+
+**Partner view (`pv`) is strictly read-only (fixed 2026-08-19):** the share-link viewer sees
+the name (plain label, not editable), the phase pills (disabled), the hero card and the
+calendar. No share button, no logging (long-press is a no-op), and Settings show *only* the
+"Appearance" group — name/period/cycle/save/delete belong to the owner and are hidden behind
+`{!pv&&(…)}`. The setup sheet never auto-opens in the partner view. The "↩ back to my own
+app" button only appears when this device actually has own data in `sc-v1`.
+
+The partner view survives being installed to the home screen. iOS follows the manifest's
+`start_url` ("/") instead of the page URL and therefore drops the `#p=` fragment, which used
+to land the partner in the setup sheet. Two things prevent that: the last opened payload plus
+that viewer's appearance prefs are stored under **`sc-pv1`** `{p,dk,lg}` and restored when
+there is no hash *and* no own data (own `sc-v1` data always wins), and while in the partner
+view the app removes the `<link rel="manifest">` and puts `#p=…` back into the URL via
+`history.replaceState`, so an "Add to Home Screen" captures the full share URL. Never let the
+partner view write to `sc-v1`.
 
 **Explicitly out of scope (decided 2026-07-09, don't re-add without asking):** a separate toggle for whether the name or future predictions are shared was considered and explicitly rejected by Michael when the granular-sharing feature was speced — only phase-selection + explanation-text toggle were requested.
 
