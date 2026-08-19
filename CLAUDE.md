@@ -20,25 +20,42 @@ ShareCycle is a privacy-first menstrual cycle tracking PWA. All user data stays 
 
 **Data model** (localStorage key `sc-v1`):
 ```js
-{ nm, lp, cl, pl, dk, lps, lg }
-// name, last-period date (ISO), cycle length (days), period length (days), dark-mode bool,
+{ nm, lp, ps, cl, pl, dk, lps, lg }
+// name, last-period date (ISO), ps = period-start history (array of ISO dates, ascending),
+// cycle length (days), period length (days), dark-mode bool,
 // lps = logged PMS start date (ISO, optional). When set, phOf() shifts the luteal→PMS
 // boundary to this actual start instead of the default cl-5 estimate. Absent on older data.
 // lg = UI language "de" | "en" (optional). Absent on older data → treated as "de".
 ```
+`ps` is the source of truth for everything the calendar shows; `lp` is kept as its last
+element for backwards compatibility (older data / older share links carry only `lp`, which
+is migrated to `ps: [lp]` on load).
 
 **Core pure utilities** (all in ShareCycle.jsx):
 | Function | Purpose |
 |----------|---------|
-| `phOf(date)` | Returns cycle phase for a date: `period`, `follicular`, `ovulation`, `luteal`, `pms` |
-| `cycDay(date)` | Cycle day number (1-based) |
-| `isPeak(date)` | True on peak ovulation day |
-| `isFertile(date)` | True in the fertile window |
-| `nextPer()` / `nextOvu()` | Predict next period / ovulation date |
+| `segOf(date, starts, cl)` | The cycle segment a date falls into: `{s, len, logged}` — see below |
+| `phOf(date, seg)` | Returns cycle phase for a date: `period`, `follicular`, `ovulation`, `luteal`, `pms` |
+| `cycDay(date, seg)` | Cycle day number (1-based) |
+| `isPeak(date, seg)` | True on peak ovulation day |
+| `isFertile(date, seg)` | True in the fertile window |
+| `nextPer()` / `nextOvu()` | Next period / ovulation date relative to a reference date |
+| `putStart()` / `delStart()` | Add/correct/remove an entry in the period-start history |
 | `encShare()` / `decShare()` | Base64-URL encode/decode cycle data for sharing |
 | `loadLS()` / `saveLS()` | Read/write the `sc-v1` localStorage entry |
 
-**URL sharing:** Share links use hash fragments (`#p=<base64>`). The app detects these on load and enters a read-only preview mode. The share payload is `{nm,lp,cl,pl,sp,sxt}`:
+**Past cycles never move (fixed 2026-08-19):** every date is resolved through `segOf()`,
+which anchors it to the last *logged* period start at or before it. A cycle bounded by two
+logged starts uses the real gap between them as its length, so its phases stay put forever;
+only the open (latest) cycle and cycles with no logged start are extrapolated with the
+default `cl`. Logging a new period start therefore never repaints earlier months — the bug
+where it did came from computing every date as `dif(date, lp) % cl`. Logged period starts
+render solid in the calendar, predicted/extrapolated ones hatched. Two starts closer than
+`MINGAP` (10 days) are treated as a correction of the same entry, not as two cycles; a
+logged start can be removed again via long-press (only while more than one exists).
+
+**URL sharing:** Share links use hash fragments (`#p=<base64>`). The app detects these on load and enters a read-only preview mode. The share payload is `{nm,lp,ps,cl,pl,sp,sxt}` (`ps` so the partner sees the same past
+months; links without it fall back to `[lp]`):
 - `sp` — object of 5 phase booleans (`period`, `follicular`, `ovulation`, `luteal`, `pms`) controlling which phases are visible to the partner
 - `sxt` — boolean toggling whether partner-friendly explanation texts are shown
 

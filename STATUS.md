@@ -1,6 +1,6 @@
 # STATUS.md
 
-Stand: 2026-07-23. Lebendes Statusdokument — hier reicht ein Blick, um in einem neuen Kontextfenster sofort weiterzumachen.
+Stand: 2026-08-19. Lebendes Statusdokument — hier reicht ein Blick, um in einem neuen Kontextfenster sofort weiterzumachen.
 
 ## Projekt
 
@@ -34,6 +34,19 @@ ShareCycle ist eine privacy-first Zyklus-Tracking-PWA (React/Vite, **zweisprachi
 ## Offener PR (Session 2026-07-23)
 
 **PR #5 — Zweisprachigkeit DE/EN** (`claude/tree-en-version-planning-5a4cd5 → main`, noch offen): In-App-Sprachumschalter, **ein Build für beide Sprachen** (kein separater englischer Fork). Alle UI-Strings in einem `STR`-Dictionary (`{de,en}`), dazu sprach-gekeyte `PLBL`/`PTXT`/`MO`/`WD`; `dTxt`/`niceFmt` nehmen die Sprache (Datum `en-US` vs `de-DE`, Woche in beiden Mo-first). Sprache wird beim ersten Start aus dem Browser erkannt (`detectLang()`), in Einstellungen → Darstellung (DE/EN) umschaltbar, als `lg` in `sc-v1` persistiert; `document.documentElement.lang` mitgeführt. Geteilte `#p=`-Links tragen keine Sprache — jede*r sieht sie in der eigenen. `index.html` + PWA-Manifest auf Englisch. **Regel in CLAUDE.md verankert:** neuer UI-Text immer als DE- **und** EN-Key, nie inline, nie einen sprachspezifischen Build forken. Branch wurde auf aktuelles `main` rebased, erbt also alle Features (Blüte, Rück-Kalender, granulares Teilen, PMS-Logging).
+
+## Aktuelle Session (2026-08-19)
+
+**Bugfix — Vormonate verschieben sich nicht mehr** (Branch `claude/periodenbeginn-vormonat-bug-wg5kdd`): Bisher wurde jedes Datum als `dif(date, lp) % cl` berechnet — ein einziger Periodenbeginn plus Zykluslänge. Trug man den tatsächlichen Beginn im aktuellen Monat ein, wurde damit rückwirkend der komplette Kalender neu gerechnet: vergangene, real erlebte Perioden rutschten auf andere Tage. Jetzt gibt es eine **Historie aller eingetragenen Periodenbeginne** (`ps`, ISO-Array, aufsteigend; `lp` bleibt als letztes Element für Abwärtskompatibilität erhalten und wird bei Altdaten zu `ps: [lp]` migriert).
+
+Neue Kernfunktion `segOf(date, starts, cl)` liefert das Zyklus-Segment eines Datums (`{s, len, logged}`): Es wird am letzten *eingetragenen* Beginn davor verankert. Liegen zwei eingetragene Beginne vor, ist die Segmentlänge der **echte Abstand** zwischen ihnen — abgeschlossene Zyklen sind damit fixiert. Nur der offene (letzte) Zyklus und Zeiträume ohne Eintrag werden weiterhin mit der Standard-Zykluslänge fortgeschrieben. `phOf`/`cycDay`/`isPeak`/`isFertile` nehmen jetzt dieses Segment statt `(start, cl)`, `nextPer`/`nextOvu` rechnen vom Segment des Bezugsdatums aus.
+
+Weitere Punkte:
+- Eingetragene Periodenstarts werden solid dargestellt, prognostizierte/extrapolierte gestrichelt.
+- `putStart()` behandelt einen neuen Beginn im Abstand < 10 Tagen (`MINGAP`) als Korrektur des bestehenden Eintrags statt als neuen Zyklus; der Datepicker in den Einstellungen ersetzt gezielt den aktuellsten Eintrag.
+- Neue Long-Press-Option „Periodenbeginn entfernen" (DE/EN), sichtbar nur auf einem eingetragenen Starttag und nur solange mehr als einer existiert.
+- Share-Link-Payload trägt `ps` mit, damit die Partneransicht dieselben Vormonate zeigt; alte Links ohne `ps` funktionieren unverändert (`[lp]`).
+- Verifiziert mit Browser-Smoke-Test: nach Eintragen eines neuen Beginns ändert sich in den Vormonaten keine einzige Kalenderzelle mehr (vorher: kompletter Rutsch), Altdaten und alte Share-Links rendern fehlerfrei.
 
 ## Lokale Vorschau
 
