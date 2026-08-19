@@ -31,6 +31,14 @@ ShareCycle ist eine privacy-first Zyklus-Tracking-PWA (React/Vite, deutschsprach
 3. **Doku nachgezogen:** `lps` im Datenmodell in CLAUDE.md dokumentiert; APPSTORE.md/README.md/CLAUDE.md auf granulares Teilen umgestellt.
 4. **PR #3 — Eisprung-Blüte + 6-Monats-Kalender** (`feature/ovulation-bloom-6month-calendar → main`): Eisprung-Symbol jetzt SVG-Blüte statt `✿` — Blütenblätter wachsen zum Eisprung hin (15→20→15px) und werden röter (blass → kräftig rot mit weißer Mitte → blass), danach wieder abnehmend. Kalender zeigt jetzt 6 Monate rückwirkend (−6 bis +11, 18 Monate); Wochentags-Kopf sticky; Auto-Scroll auf den aktuellen Monat beim Öffnen (an `document.fonts.ready` gekoppelt, damit der Webfont-Reflow den Scroll nicht verfälscht). `isPeak`/`isFertile` dadurch ungenutzt, aber als dokumentierte Utilities belassen.
 
+## In Arbeit (Branch `fix/preview-lock-nonshared-filters`, 2026-08-19)
+
+- **Nicht geteilte Phasen-Filter in der Partner-Vorschau ausgeblendet:** erst gesperrt/ausgegraut (Commit `64efc2d`), jetzt komplett weggelassen — in der Vorschau erscheinen nur die freigegebenen Pillen, und die sind normal an-/abwählbar. Sind gar keine Phasen freigegeben, entfällt die Pillen-Zeile.
+- **Zahnrad statt `↩` in der Vorschau-Titelleiste:** der Button oben rechts (zurück zur eigenen App/Einstellungen) nutzt jetzt das gleiche Zahnrad-Icon und den gleichen runden Button-Stil wie im Eigen-Modus (das `↩`-Zeichen wurde auf iOS als blaues Emoji gerendert).
+- **Teilen über das iPhone-Teilen-Menü:** Der Primärbutton im Teilen-Sheet ruft jetzt `navigator.share({title,text,url})` auf (iOS/Android-Share-Sheet, Text „Mein Zyklus – geteilt von NAME"). Ohne `navigator.share` (Desktop) fällt er auf die Zwischenablage zurück; wo Share existiert, gibt es zusätzlich „Stattdessen kopieren".
+- **Titelleiste in der Partner-Vorschau** zeigt statt der Namens-Pille `geteilt von „NAME"` (nicht klickbar, kein versehentliches Namens-Editieren in der Vorschau).
+- Noch nicht committet/gemergt.
+
 ## Lokale Vorschau
 
 `.claude/launch.json` definiert den Dev-Server (`sharecycle-dev`, `npm run dev`, Port 5173, cwd `sharecycle-pwa`) — für die Browser-Vorschau in Claude Code bzw. lokal via `npm run dev` im `sharecycle-pwa/`-Ordner.

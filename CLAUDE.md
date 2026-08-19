@@ -41,6 +41,12 @@ ShareCycle is a privacy-first menstrual cycle tracking PWA. All user data stays 
 - `sp` — object of 5 phase booleans (`period`, `follicular`, `ovulation`, `luteal`, `pms`) controlling which phases are visible to the partner
 - `sxt` — boolean toggling whether partner-friendly explanation texts are shown
 
+Sharing goes through the **native share sheet**: the share sheet's primary button calls `navigator.share({title,text,url})` (iOS/Android). Browsers without `navigator.share` fall back to the clipboard, and where `navigator.share` exists a secondary "Stattdessen kopieren" button keeps the clipboard path available. `shareLink()` must stay synchronous up to the `navigator.share()` call — Safari rejects it otherwise (user-gesture requirement).
+
+In the partner preview the nav bar shows `geteilt von „NAME"` instead of the (tappable, name-editing) name pill.
+
+In the partner preview the phase filter pills are **filtered down to the shared phases** (`pills`, built right before the render) — non-shared phases are omitted entirely rather than shown greyed out/locked, and the shared ones toggle normally. If nothing is shared, the pill row is dropped. The preview's top-right button (clear hash + reload → back to your own app) uses the same gear icon and round button style as the settings button in normal mode; the previous `↩` character rendered as a blue emoji box on iOS.
+
 Older links without `sp` are treated defensively as "everything visible". The `PTXT` constant holds 5 warm, short partner-facing explanation texts (one per phase), shown only in the partner preview (hero card) when `sxt` is on and the current phase is shared.
 
 Default `sp` when opening the share sheet for the first time: `{period:true,follicular:false,ovulation:true,luteal:false,pms:true}` — period/ovulation/PMS are the phases most relevant to a partner, follicular/luteal are off by default. `sxt` (explanation texts) defaults to `true`.
