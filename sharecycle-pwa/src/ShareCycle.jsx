@@ -130,7 +130,9 @@ const STR={
     cancel:"Abbrechen",chooseDate:"Datum wählen",
     shareExport:"Teilen & Export",partnerLink:"PARTNER-LINK",shareChoose:"Wähle, was dein Partner sehen soll.",
     partnerInfo:"Partner-Infos",partnerInfoSub:"Kurzer Hinweis, wie er unterstützen kann",
-    copied:"✓ Kopiert!",copyLink:"Link kopieren",calExport:"KALENDER EXPORT",icalSub:".ics · Periode & Eisprung",
+    copied:"✓ Kopiert!",copyLink:"Link kopieren",shareLink:"Link teilen",copyInstead:"Stattdessen kopieren",
+    calExport:"KALENDER EXPORT",icalSub:".ics · Periode & Eisprung",
+    sharedBy:"geteilt von",shareTitle:"Mein Zyklus",shareText:"Mein Zyklus – geteilt von",
     googleCal:"Google Kalender",addNextPeriod:"Nächste Periode eintragen",
     setPeriodStart:"Periodenbeginn setzen",setPeriodStartSub:"Starttag der Periode eintragen",
     setPmsStart:"PMS-Beginn setzen",setPmsStartSub:"Tatsächlichen PMS-Start eintragen",
@@ -147,7 +149,9 @@ const STR={
     cancel:"Cancel",chooseDate:"Choose date",
     shareExport:"Share & export",partnerLink:"PARTNER LINK",shareChoose:"Choose what your partner sees.",
     partnerInfo:"Partner tips",partnerInfoSub:"A short note on how to support them",
-    copied:"✓ Copied!",copyLink:"Copy link",calExport:"CALENDAR EXPORT",icalSub:".ics · Period & ovulation",
+    copied:"✓ Copied!",copyLink:"Copy link",shareLink:"Share link",copyInstead:"Copy instead",
+    calExport:"CALENDAR EXPORT",icalSub:".ics · Period & ovulation",
+    sharedBy:"shared by",shareTitle:"My cycle",shareText:"My cycle – shared by",
     googleCal:"Google Calendar",addNextPeriod:"Add next period",
     setPeriodStart:"Set period start",setPeriodStartSub:"Log the first day of the period",
     setPmsStart:"Set PMS start",setPmsStartSub:"Log the actual PMS start",
@@ -227,6 +231,12 @@ export default function ShareCycle(){
     }catch{}
   },[pvRaw]);
 
+  // In a shared-link preview, initialise the phase filters to exactly what the sharer selected,
+  // so every shared phase starts visible (non-shared ones are dropped from the pill row below).
+  useEffect(()=>{
+    if(pv&&pv.sp){setSpd(!!pv.sp.period);setSfl(!!pv.sp.follicular);setSov(!!pv.sp.ovulation);setSlt(!!pv.sp.luteal);setSpm(!!pv.sp.pms);}
+  },[pv]);
+
   const T=dk?DK:LK;
   const L=lg,S=STR[L];
   const today=useMemo(()=>toD(new Date()),[]);
@@ -289,6 +299,21 @@ export default function ShareCycle(){
   const slink=useMemo(()=>lp?`${location.origin}${location.pathname}#p=${encShare({nm,lp,ps,cl,pl},sp,sxt)}`:"",
     [nm,lp,ps,cl,pl,sp,sxt]);
 
+  // Native share sheet (iOS/Android). Falls back to the clipboard on desktop browsers
+  // without navigator.share. Must stay synchronous up to the navigator.share() call,
+  // otherwise Safari drops the user-gesture and rejects.
+  const canShare=typeof navigator!=="undefined"&&typeof navigator.share==="function";
+  const copyLink=async()=>{try{await navigator.clipboard.writeText(slink);setCp(true);setTimeout(()=>setCp(false),2000);}catch{}};
+  const shareLink=async()=>{
+    if(!slink)return;
+    if(canShare){
+      const data={title:"ShareCycle",text:nm?`${S.shareText} ${nm}`:S.shareTitle,url:slink};
+      try{await navigator.share(data);return;}
+      catch(e){if(e&&e.name==="AbortError")return;}
+    }
+    copyLink();
+  };
+
   const dlIcal=()=>{
     if(!as)return;
     const evts=[];let base=toD(as);
@@ -342,7 +367,7 @@ export default function ShareCycle(){
       // Solid (vs. hatched) = the PMS start of this cycle was actually logged, not estimated.
       const solidPMS=p==="pms"&&!!pmsInfo&&pmsInfo.logged;
       const isT=dif(date,today)===0,isSel=sel&&dif(date,sel)===0;
-      const vis=pv?true:((p==="period"&&spd)||(p==="follicular"&&sfl)||(p==="ovulation"&&sov)||(p==="luteal"&&slt)||(p==="pms"&&spm));
+      const vis=(p==="period"&&spd)||(p==="follicular"&&sfl)||(p==="ovulation"&&sov)||(p==="luteal"&&slt)||(p==="pms"&&spm);
       const partOk=!pv||ad.sp[p]!==false;
       const show=vis&&partOk;
       // Ovulation bloom: petals grow 15→20→15px and redden toward the peak day, palest at the window edges.
@@ -415,6 +440,11 @@ export default function ShareCycle(){
     return <button key={i} onClick={()=>{if(!isFut)setDpS(s);}} style={{aspectRatio:"1/1",display:"flex",alignItems:"center",justifyContent:"center",borderRadius:11,border:"none",cursor:isFut?"not-allowed":"pointer",background:isSel?T.coral:isTod?T.card3:T.card2,opacity:isFut?.3:1}}><span style={{fontSize:14,fontWeight:isSel||isTod?700:400,color:isSel?"#fff":isTod?T.coral:T.ink2,fontFamily:F}}>{d}</span></button>;
   });
 
+  // Phase filter pills. In a shared-link preview only the phases the sharer released
+  // are offered at all — non-shared ones are omitted instead of shown as locked.
+  const pills=[["period",spd,setSpd,T.coral,S.pPeriod],["follicular",sfl,setSfl,T.follicular,S.pFollicular],["ovulation",sov,setSov,T.gold,S.pOvulation],["luteal",slt,setSlt,T.luteal,S.pLuteal],["pms",spm,setSpm,T.mauve,S.pPms]]
+    .filter(([key])=>!pv||ad.sp[key]!==false);
+
   return(
     <div style={{height:"100vh",background:T.bg,color:T.ink,fontFamily:F,maxWidth:430,margin:"0 auto",display:"flex",flexDirection:"column",overflow:"hidden"}}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0;-webkit-touch-callout:none;user-select:none;-webkit-user-select:none;}html,body{background:${T.bg};overflow-x:hidden;}button{cursor:pointer;border:none;background:none;}input,textarea{user-select:text;-webkit-user-select:text;}@keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}@keyframes slideUpBanner{from{transform:translateX(-50%) translateY(20px);opacity:0}to{transform:translateX(-50%) translateY(0);opacity:1}}`}</style>
@@ -425,31 +455,26 @@ export default function ShareCycle(){
         <div style={{textAlign:"center"}}>
           {ad.nm
             ?(pv
-              ?<span style={{display:"inline-block",fontSize:16,fontWeight:700,color:T.coral,padding:"4px 12px",borderRadius:999,border:`1px solid ${T.coral}44`,fontFamily:F}}>{ad.nm}</span>
+              ?<div style={{fontSize:13,fontWeight:600,color:T.ink2,fontFamily:F,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{S.sharedBy} <span style={{color:T.coral,fontWeight:700}}>{ad.nm}</span></div>
               :<button onClick={()=>{setNi(ad.nm);setSNm(true);}} style={{fontSize:16,fontWeight:700,color:T.coral,padding:"4px 12px",borderRadius:999,border:`1px solid ${T.coral}44`,fontFamily:F}}>{ad.nm}</button>)
             :<span style={{fontSize:16,fontWeight:700,fontFamily:F}}><span style={{color:T.ink}}>Share</span><span style={{color:T.coral}}>Cycle</span></span>}
         </div>
         <div style={{display:"flex",gap:6,justifyContent:"flex-end",alignItems:"center"}}>
-          {pv&&own&&<button onClick={()=>{window.location.hash="";window.location.reload();}} style={{color:T.coral,fontSize:12,fontWeight:600,padding:"6px 10px",borderRadius:999,border:`1px solid ${T.coral}44`,fontFamily:F}}>↩</button>}
-          <>
-              <button onClick={()=>setSSetup(true)} style={{width:34,height:34,display:"flex",alignItems:"center",justifyContent:"center",background:T.card2,borderRadius:"50%",color:T.ink2}}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06-.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
-              </button>
-              {!pv&&lp&&<button onClick={()=>setSSh(true)} style={{background:T.coral,color:"#fff",fontSize:13,fontWeight:700,padding:"7px 12px",borderRadius:999,fontFamily:F}}>{S.share}</button>}
-            </>
+          <button onClick={()=>{if(pv&&own){window.location.hash="";window.location.reload();return;}setSSetup(true);}} title={S.settings} style={{width:34,height:34,display:"flex",alignItems:"center",justifyContent:"center",background:T.card2,borderRadius:"50%",color:T.ink2}}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06-.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+          </button>
+          {!pv&&lp&&<button onClick={()=>setSSh(true)} style={{background:T.coral,color:"#fff",fontSize:13,fontWeight:700,padding:"7px 12px",borderRadius:999,fontFamily:F}}>{S.share}</button>}
         </div>
       </nav>
 
       {/* Phase toggles — always visible, compact pill row */}
-      {as&&(
+      {as&&pills.length>0&&(
         <div style={{display:"flex",gap:6,padding:"8px 14px 6px",flexShrink:0,overflowX:"auto",borderBottom:`1px solid ${T.line}`,background:T.bg+"F0",backdropFilter:"blur(8px)"}}>
-          {[["period","P",spd,setSpd,T.coral,S.pPeriod],["follicular","F",sfl,setSfl,T.follicular,S.pFollicular],["ovulation","◆",sov,setSov,T.gold,S.pOvulation],["luteal","L",slt,setSlt,T.luteal,S.pLuteal],["pms","~",spm,setSpm,T.mauve,S.pPms]].map(([key,icon,stateOn,set,col,tip])=>{
-            const on=pv?ad.sp[key]!==false:stateOn;
-            return <div key={tip} onClick={pv?undefined:()=>set(v=>!v)} title={tip} style={{display:"flex",alignItems:"center",gap:4,padding:"5px 9px",borderRadius:999,background:on?col+"30":T.card2,border:`1px solid ${on?col:T.line2}`,cursor:pv?"default":"pointer",flexShrink:0,userSelect:"none",opacity:pv?.5:1}}>
+          {pills.map(([key,on,set,col,tip])=>
+            <div key={key} onClick={()=>set(v=>!v)} title={tip} style={{display:"flex",alignItems:"center",gap:4,padding:"5px 9px",borderRadius:999,background:on?col+"30":T.card2,border:`1px solid ${on?col:T.line2}`,cursor:"pointer",flexShrink:0,userSelect:"none"}}>
               <div style={{width:7,height:7,borderRadius:"50%",background:on?col:T.muted}}/>
               <span style={{fontSize:11,fontWeight:700,color:on?col:T.muted,fontFamily:F,whiteSpace:"nowrap"}}>{tip}</span>
-            </div>;
-          })}
+            </div>)}
         </div>
       )}
 
@@ -665,7 +690,11 @@ export default function ShareCycle(){
             <div style={{background:T.card2,borderRadius:12,marginTop:12,marginBottom:4}}>
               <input readOnly value={slink} onClick={e=>e.target.select()} style={{width:"100%",background:"transparent",border:"none",outline:"none",padding:"12px 14px",fontSize:11,color:T.coral,display:"block",fontFamily:"ui-monospace,monospace"}}/>
             </div>
-            <button onClick={async()=>{try{await navigator.clipboard.writeText(slink);setCp(true);setTimeout(()=>setCp(false),2000);}catch{}}} style={{display:"block",width:"100%",background:T.coral,color:"#fff",fontSize:16,fontWeight:700,padding:15,borderRadius:16,border:"none",cursor:"pointer",marginTop:8,fontFamily:F}}>{cp?S.copied:S.copyLink}</button>
+            <button onClick={shareLink} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,width:"100%",background:T.coral,color:"#fff",fontSize:16,fontWeight:700,padding:15,borderRadius:16,border:"none",cursor:"pointer",marginTop:8,fontFamily:F}}>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 16V3"/><path d="M8 7l4-4 4 4"/><path d="M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"/></svg>
+              {canShare?S.shareLink:cp?S.copied:S.copyLink}
+            </button>
+            {canShare&&<button onClick={copyLink} style={{display:"block",width:"100%",background:"transparent",color:T.ink2,fontSize:14,fontWeight:600,padding:"10px 0 2px",border:"none",cursor:"pointer",fontFamily:F}}>{cp?S.copied:S.copyInstead}</button>}
             <div style={{fontSize:11,fontWeight:700,letterSpacing:".1em",textTransform:"uppercase",color:T.muted,margin:"18px 2px 6px",fontFamily:F}}>{S.calExport}</div>
             <div style={{background:T.card2,borderRadius:16,overflow:"hidden"}}>
               <button onClick={dlIcal} style={{display:"flex",justifyContent:"space-between",alignItems:"center",width:"100%",padding:"13px 16px",background:"transparent",border:"none",cursor:"pointer",textAlign:"left",fontFamily:F}}>

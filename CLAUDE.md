@@ -68,6 +68,14 @@ months; links without it fall back to `[lp]`):
 - `sp` — object of 5 phase booleans (`period`, `follicular`, `ovulation`, `luteal`, `pms`) controlling which phases are visible to the partner
 - `sxt` — boolean toggling whether partner-friendly explanation texts are shown
 
+Sharing goes through the **native share sheet**: the share sheet's primary button calls `navigator.share({title,text,url})` (iOS/Android). Browsers without `navigator.share` fall back to the clipboard, and where `navigator.share` exists a secondary "copy instead" button keeps the clipboard path available. `shareLink()` must stay synchronous up to the `navigator.share()` call — Safari rejects it otherwise (user-gesture requirement).
+
+In the partner preview the nav bar shows `{S.sharedBy} NAME` instead of the (tappable, name-editing) name pill.
+
+In the partner preview the phase filter pills are **filtered down to the shared phases** (`pills`, built right before the render) — non-shared phases are omitted entirely rather than shown greyed out or locked, and the shared ones toggle normally, since they only filter the display. If nothing is shared, the pill row is dropped. Because they are interactive in a preview too, `vis` in the calendar loop always reads the local filter state (never a hardcoded `true` for `pv`).
+
+There is exactly **one** round gear button in the top right. Normally (and for a partner) it opens the settings sheet; when the owner opens her own share link (`pv&&own`) the same button leaves the preview instead (clear hash + reload → back to the real app). Two gears side by side would be confusing, and the previous `↩` character rendered as a blue emoji box on iOS.
+
 Older links without `sp` are treated defensively as "everything visible". The `PTXT` constant holds 5 warm, short partner-facing explanation texts (one per phase), shown only in the partner preview (hero card) when `sxt` is on and the current phase is shared.
 
 Default `sp` when opening the share sheet for the first time: `{period:true,follicular:false,ovulation:true,luteal:false,pms:true}` — period/ovulation/PMS are the phases most relevant to a partner, follicular/luteal are off by default. `sxt` (explanation texts) defaults to `true`.

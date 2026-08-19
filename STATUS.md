@@ -59,8 +59,17 @@ Ursache: iOS nutzt beim Installieren die `start_url` des Manifests (`/`) statt d
 Behoben:
 - Neuer localStorage-Key **`sc-pv1`** `{p, dk, lg}`: zuletzt geöffnetes Share-Payload plus die Darstellungs-Einstellungen *dieses* Betrachters. Beim Start ohne Hash wird daraus die Partner-Ansicht wiederhergestellt — eigene Daten in `sc-v1` haben immer Vorrang, die Partner-Ansicht schreibt nie nach `sc-v1`.
 - In der Partner-Ansicht wird der `<link rel="manifest">` entfernt und `#p=…` per `history.replaceState` wieder in die URL gesetzt, damit „Zum Home-Bildschirm" die vollständige Share-URL mitnimmt.
-- Partner-Ansicht ist jetzt strikt read-only: Name nur als Label (nicht mehr editierbar), kein Teilen-Button, Long-Press ohne Wirkung, und die Einstellungen zeigen **nur** die Gruppe „Darstellung" (Dunkles Design + Sprache). Das Setup-Sheet geht dort nie automatisch auf; der „↩"-Button erscheint nur, wenn das Gerät eigene Daten hat.
+- Partner-Ansicht ist jetzt strikt read-only: Name nur als Label (nicht mehr editierbar), kein Teilen-Button, Long-Press ohne Wirkung, und die Einstellungen zeigen **nur** die Gruppe „Darstellung" (Dunkles Design + Sprache). Das Setup-Sheet geht dort nie automatisch auf; der Zurück-Button (inzwischen das Zahnrad, siehe unten) erscheint nur, wenn das Gerät eigene Daten hat.
 - Verifiziert im Browser: Partner mit frischem Storage — Link direkt geöffnet und Start ohne Hash zeigen beide den Kalender statt des Setups, `sc-v1` bleibt leer, Settings enthalten nur „Darstellung". Besitzerinnen-Flow unverändert (Erststart öffnet Setup, volle Einstellungen, Teilen-Button, Manifest bleibt).
+
+## Vorschau-Filter & Share-Sheet (2026-08-19, Branch `fix/preview-lock-nonshared-filters` → PR #7)
+
+- **Nicht geteilte Phasen-Filter in der Partner-Vorschau ausgeblendet:** erst gesperrt/ausgegraut (Commits `64efc2d`, `be0fa84`), jetzt komplett weggelassen. Die Pillen-Liste wird direkt vor dem Render zu `pills` gefiltert (`!pv||ad.sp[key]!==false`); in der Vorschau erscheinen also nur die freigegebenen Phasen — und die sind **normal an-/abwählbar** (volle Farbe, klickbar), weil sie reine Anzeige-Filter sind und keine Daten ändern. Sind gar keine Phasen freigegeben, entfällt die ganze Pillen-Zeile. Dazu nutzt die Kalender-Sichtbarkeit (`vis`) in der Vorschau wieder die lokalen Filter-States statt `true` — sonst hätten die Pillen keine Wirkung.
+- **Ein Zahnrad statt `↩`:** oben rechts gibt es in jedem Modus genau **einen** runden Zahnrad-Button. Im Eigen-Modus und in der Partner-Ansicht öffnet er die Einstellungen; öffnet die Besitzerin ihren eigenen Link (`pv&&own`), verlässt derselbe Button die Vorschau (Hash leeren + Reload) und landet in der echten App samt Einstellungen. Das alte `↩`-Zeichen wurde auf iOS als blaues Emoji-Kästchen gerendert; zwei Zahnräder nebeneinander wären verwirrend gewesen.
+- **Teilen über das iPhone-Teilen-Menü:** Der Primärbutton im Teilen-Sheet ruft `navigator.share({title,text,url})` auf (Text „Mein Zyklus – geteilt von NAME" / „My cycle – shared by NAME"). Ohne `navigator.share` (Desktop) fällt er auf die Zwischenablage zurück; wo Share existiert, gibt es zusätzlich „Stattdessen kopieren". `shareLink()` bleibt bis zum `navigator.share()`-Aufruf synchron, sonst verwirft Safari den User-Gesture.
+- **Titelleiste in der Partner-Vorschau** zeigt `geteilt von NAME` statt der Namens-Pille (nicht klickbar — passt zur read-only-Ansicht).
+- Alle neuen Strings zweisprachig in `STR` (`sharedBy`, `shareLink`, `copyInstead`, `shareTitle`, `shareText`); Pillen-Labels kommen aus `S.pPeriod` usw.
+- `main` (PR #5 Zweisprachigkeit, PR #6 Vormonats-Bugfix/read-only-Partneransicht) wurde in den Branch gemergt und die Konflikte in `ShareCycle.jsx` von Hand aufgelöst.
 
 ## Lokale Vorschau
 
